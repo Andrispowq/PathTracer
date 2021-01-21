@@ -1,0 +1,6 @@
+[submodule "PathTracer/vendor/GLFW"]
+	path = PathTracer/vendor/GLFW
+	url = https://github.com/Andrispowq/glfw
+[submodule "PathTracer/vendor/ImGui"]
+	path = PathTracer/vendor/ImGui
+	url = https://github.com/Andrispowq/imgui
