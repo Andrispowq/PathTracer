@@ -1,6 +1,6 @@
 workspace "PathTracer"
     architecture "x64"
-    startproject "PathTracer"
+    startproject "TesterProject"
 
     configurations
     {
@@ -30,7 +30,7 @@ group ""
 
 project "PathTracer"
     location "PathTracer"
-    kind "ConsoleApp"
+    kind "StaticLib"
     language "C++"
     cppdialect "C++17"
     staticruntime "off"
@@ -61,7 +61,7 @@ project "PathTracer"
         "%{IncludeDir.ImGUI}",
         "%{IncludeDir.STB}",
         "%{IncludeDir.tinyobj}",
-        "%{prj.location}/src/engine"
+        "%{prj.location}/src"
     }
 
     links
@@ -70,6 +70,63 @@ project "PathTracer"
         "GLFW",
         "GLAD",
         "ImGUI"
+    }
+
+    filter "system:windows"
+        systemversion "latest"
+
+        defines
+        {
+            "PR_FAST_MATH"
+        }
+    
+    filter "configurations:Debug"
+        defines "PR_DEBUG"
+        runtime "Debug"
+        symbols "on"
+    
+    filter "configurations:Release"
+        defines "PR_RELEASE"
+        runtime "Release"
+        optimize "on"
+
+project "TesterProject"
+    location "TesterProject"
+    kind "ConsoleApp"
+    language "C++"
+    cppdialect "C++17"
+    staticruntime "off"
+    
+    targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+    objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
+
+    files
+    {
+        "%{prj.name}/src/**.h",
+        "%{prj.name}/src/**.hpp",
+        "%{prj.name}/src/**.cpp"
+    }
+
+    defines
+    {
+        "_CRT_SECURE_NO_WARNINGS",
+        "GLFW_INCLUDE_NONE"
+    }
+
+    includedirs
+    {
+        "%{IncludeDir.GLFW}",
+        "%{IncludeDir.GLAD}",
+        "%{IncludeDir.ImGUI}",
+        "%{IncludeDir.STB}",
+        "%{IncludeDir.tinyobj}",
+        "%{prj.location}/src",
+        "%{wks.location}/PathTracer/src"
+    }
+
+    links
+    {
+        "PathTracer"
     }
 
     filter "system:windows"
