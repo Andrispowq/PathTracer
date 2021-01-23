@@ -15,6 +15,9 @@ namespace Prehistoric
 
 		AddUniform("environmentMap");
 		AddUniform("lod");
+
+		AddUniform("gamma");
+		AddUniform("exposure");
 	}
 
 	void GLEnvironmentShader::UpdateUniforms(const Matrix4f& projection, const Matrix4f& view, Texture* texture, float lod) const
@@ -25,5 +28,8 @@ namespace Prehistoric
 		texture->Bind(0);
 		SetUniformi("environmentMap", 0);
 		SetUniformf("lod", lod);
+
+		SetUniformf("gamma", EngineConfig::rendererGamma);
+		SetUniformf("exposure", EngineConfig::rendererExposure);
 	}
 };

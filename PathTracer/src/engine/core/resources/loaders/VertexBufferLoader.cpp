@@ -17,10 +17,6 @@ namespace Prehistoric
                 {
                     ret = new GLMeshVertexBuffer(window, ext->mesh.value());
                 }
-                else
-                {
-                    ret = new VKMeshVertexBuffer(window, ext->mesh.value());
-                }
             }
             else
             {
@@ -28,10 +24,6 @@ namespace Prehistoric
                 if (FrameworkConfig::api == OpenGL)
                 {
                     ret = new GLMeshVertexBuffer(window, mesh);
-                }
-                else
-                {
-                    ret = new VKMeshVertexBuffer(window, mesh);
                 }
             }
 

@@ -626,6 +626,53 @@ Matrix4f Matrix4f::View(const Vector3f& forward, const Vector3f& up)
 	return mat;
 }
 
+Matrix4f Matrix4f::Invert() const
+{
+	float s0 = Get(0, 0) * Get(1, 1) - Get(1, 0) * Get(0, 1);
+	float s1 = Get(0, 0) * Get(1, 2) - Get(1, 0) * Get(0, 2);
+	float s2 = Get(0, 0) * Get(1, 3) - Get(1, 0) * Get(0, 3);
+	float s3 = Get(0, 1) * Get(1, 2) - Get(1, 1) * Get(0, 2);
+	float s4 = Get(0, 1) * Get(1, 3) - Get(1, 1) * Get(0, 3);
+	float s5 = Get(0, 2) * Get(1, 3) - Get(1, 2) * Get(0, 3);
+
+	float c5 = Get(2, 2) * Get(3, 3) - Get(3, 2) * Get(2, 3);
+	float c4 = Get(2, 1) * Get(3, 3) - Get(3, 1) * Get(2, 3);
+	float c3 = Get(2, 1) * Get(3, 2) - Get(3, 1) * Get(2, 2);
+	float c2 = Get(2, 0) * Get(3, 3) - Get(3, 0) * Get(2, 3);
+	float c1 = Get(2, 0) * Get(3, 2) - Get(3, 0) * Get(2, 2);
+	float c0 = Get(2, 0) * Get(3, 1) - Get(3, 0) * Get(2, 1);
+
+	float div = (s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0);
+	if (div == 0)
+		PR_LOG_ERROR("Matrix is not invertible!\n");
+
+	float invdet = 1.0f / div;
+
+	Matrix4f invM = Matrix4f::Identity();
+
+	invM.Set(0, 0, (Get(1, 1) * c5 - Get(1, 2) * c4 + Get(1, 3) * c3) * invdet);
+	invM.Set(0, 1, (-Get(0, 1) * c5 + Get(0, 2) * c4 - Get(0, 3) * c3) * invdet);
+	invM.Set(0, 2, (Get(3, 1) * s5 - Get(3, 2) * s4 + Get(3, 3) * s3) * invdet);
+	invM.Set(0, 3, (-Get(2, 1) * s5 + Get(2, 2) * s4 - Get(2, 3) * s3) * invdet);
+
+	invM.Set(1, 0, (-Get(1, 0) * c5 + Get(1, 2) * c2 - Get(1, 3) * c1) * invdet);
+	invM.Set(1, 1, (Get(0, 0) * c5 - Get(0, 2) * c2 + Get(0, 3) * c1) * invdet);
+	invM.Set(1, 2, (-Get(3, 0) * s5 + Get(3, 2) * s2 - Get(3, 3) * s1) * invdet);
+	invM.Set(1, 3, (Get(2, 0) * s5 - Get(2, 2) * s2 + Get(2, 3) * s1) * invdet);
+
+	invM.Set(2, 0, (Get(1, 0) * c4 - Get(1, 1) * c2 + Get(1, 3) * c0) * invdet);
+	invM.Set(2, 1, (-Get(0, 0) * c4 + Get(0, 1) * c2 - Get(0, 3) * c0) * invdet);
+	invM.Set(2, 2, (Get(3, 0) * s4 - Get(3, 1) * s2 + Get(3, 3) * s0) * invdet);
+	invM.Set(2, 3, (-Get(2, 0) * s4 + Get(2, 1) * s2 - Get(2, 3) * s0) * invdet);
+
+	invM.Set(3, 0, (-Get(1, 0) * c3 + Get(1, 1) * c1 - Get(1, 2) * c0) * invdet);
+	invM.Set(3, 1, (Get(0, 0) * c3 - Get(0, 1) * c1 + Get(0, 2) * c0) * invdet);
+	invM.Set(3, 2, (-Get(3, 0) * s3 + Get(3, 1) * s1 - Get(3, 2) * s0) * invdet);
+	invM.Set(3, 3, (Get(2, 0) * s3 - Get(2, 1) * s1 + Get(2, 2) * s0) * invdet);
+
+	return invM;
+}
+
 /*
 	The parameter <i> is the index of the row, so to get the first row, the parameter MUST be 0
 */
@@ -639,6 +686,16 @@ std::array<float, 4> const Matrix4f::getRow(int i) const
 	}
 
 	return arr;
+}
+
+float Matrix4f::Get(int x, int y) const
+{
+	return m[y * 4 + x];
+}
+
+void Matrix4f::Set(int x, int y, float val)
+{
+	m[y * 4 + x] = val;
 }
 
 void Matrix4f::clear()

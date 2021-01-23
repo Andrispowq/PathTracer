@@ -12,8 +12,6 @@
 
 #include "engine/core/config/EngineConfig.h"
 #include "engine/core/config/FrameworkConfig.h"
-#include "engine/core/config/TerrainConfig.h"
-#include "engine/core/config/AtmosphereConfig.h"
 #include "engine/core/config/EnvironmentMapConfig.h"
 
 #include "engine/core/resources/AssembledAssetManager.h"

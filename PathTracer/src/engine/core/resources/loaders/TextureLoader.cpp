@@ -5,7 +5,6 @@
 #include <stb_image.h>
 
 #include "platform/opengl/texture/GLTexture.h"
-#include "platform/vulkan/texture/VKTexture.h"
 
 namespace Prehistoric
 {
@@ -82,13 +81,6 @@ namespace Prehistoric
 				texture = new GLTexture(data.width, data.height);
 				texture->Bind();
 				texture->UploadTextureData(data.ptr.dataUC, format);
-			}
-			else if (FrameworkConfig::api == Vulkan)
-			{
-				texture = new VKTexture((VKPhysicalDevice*)window->getContext()->getPhysicalDevice(), (VKDevice*)window->getContext()->getDevice(), data.width, data.height);
-				texture->Bind();
-				texture->UploadTextureData(data.ptr.dataUC, format);
-				texture->Generate();
 			}
 		}
 
@@ -172,13 +164,6 @@ namespace Prehistoric
 					texture->Bind();
 					texture->UploadTextureData(data_.ptr.dataUC, format);
 				}
-				else if (FrameworkConfig::api == Vulkan)
-				{
-					texture = new VKTexture((VKPhysicalDevice*)window->getContext()->getPhysicalDevice(), (VKDevice*)window->getContext()->getDevice(), data_.width, data_.height);
-					texture->Bind();
-					texture->UploadTextureData(data_.ptr.dataUC, format);
-					texture->Generate();
-				}
 			}
 
 			texture->SamplerProperties(ext->filter, ext->wrapMode);
@@ -220,13 +205,6 @@ namespace Prehistoric
 				texture = new GLTexture(data.width, data.height);
 				texture->Bind();
 				texture->UploadTextureData(data.ptr.dataUC, format);
-			}
-			else if (FrameworkConfig::api == Vulkan)
-			{
-				texture = new VKTexture((VKPhysicalDevice*)window->getContext()->getPhysicalDevice(), (VKDevice*)window->getContext()->getDevice(), data.width, data.height);
-				texture->Bind();
-				texture->UploadTextureData(data.ptr.dataUC, format);
-				texture->Generate();
 			}
 		}
 

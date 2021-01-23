@@ -31,9 +31,7 @@ namespace Prehistoric
 	{
 		FrameworkConfig::LoadConfig(path + "/framework.cfg");
 		EngineConfig::LoadConfig(path + "/engine.cfg");
-		AtmosphereConfig::LoadConfig(path + "/atmosphere.cfg");
 		EnvironmentMapConfig::LoadConfig(path + "/environment_map.cfg");
-		TerrainConfig::LoadConfig(path + "/terrain.cfg");
 	}
 
 	void CoreEngine::LoadEngines()

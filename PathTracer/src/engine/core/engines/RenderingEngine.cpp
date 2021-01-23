@@ -4,7 +4,6 @@
 #include "platform/windows/WindowsWindow.h"
 
 #include "platform/opengl/rendering/GLRenderer.h"
-#include "platform/vulkan/rendering/VKRenderer.h"
 
 #include "engine/common/util/DeviceProperties.h"
 
@@ -37,13 +36,8 @@ namespace Prehistoric
 
 		if (FrameworkConfig::api == OpenGL)
 		{
-			camera = std::make_unique<Camera>(5.0f, 50.0f, 0.8f, 80.0f, Vector3f(-178, 102, -47));//Vector3f(0, 5, -2));;
-			camera->RotateY(-80);
-			camera->RotateX(30);
-		}
-		else
-		{
-			camera = std::make_unique<Camera>(5.0f, 50.0f, 0.8f, 80.0f, Vector3f(0, 5, -2));
+			camera = std::make_unique<Camera>(5.0f, 50.0f, 0.8f, 80.0f, Vector3f(0, 3.0, 0));
+			camera->RotateX(20);
 		}
 
 		camera->AddCameraInput(keyInput);
@@ -66,10 +60,6 @@ namespace Prehistoric
 		if (FrameworkConfig::api == OpenGL)
 		{
 			renderer = std::make_unique<GLRenderer>(window.get(), camera.get(), manager);
-		}
-		else if (FrameworkConfig::api == Vulkan)
-		{
-			renderer = std::make_unique<VKRenderer>(window.get(), camera.get(), manager);
 		}
 
 		if (FrameworkConfig::api == OpenGL)

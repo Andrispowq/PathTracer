@@ -19,6 +19,7 @@ IncludeDir = {}
 IncludeDir["GLFW"] = "%{wks.location}/PathTracer/vendor/GLFW/include"
 IncludeDir["GLAD"] = "%{wks.location}/PathTracer/vendor/GLAD/include"
 IncludeDir["ImGUI"] = "%{wks.location}/PathTracer/vendor/ImGUI"
+IncludeDir["OpenAL"] = "%{wks.location}/PathTracer/vendor/OpenAL-Soft/include"
 IncludeDir["STB"] = "%{wks.location}/PathTracer/Dependencies/include/stb"
 IncludeDir["tinyobj"] = "%{wks.location}/PathTracer/Dependencies/include/tinyobjloader"
 
@@ -26,6 +27,7 @@ group "Dependencies"
     include "PathTracer/vendor/GLFW"
     include "PathTracer/vendor/GLAD"
     include "PathTracer/vendor/ImGUI"
+    include "PathTracer/vendor/OpenAL-Soft"
 group ""
 
 project "PathTracer"
@@ -59,6 +61,7 @@ project "PathTracer"
         "%{IncludeDir.GLFW}",
         "%{IncludeDir.GLAD}",
         "%{IncludeDir.ImGUI}",
+        "%{IncludeDir.OpenAL}",
         "%{IncludeDir.STB}",
         "%{IncludeDir.tinyobj}",
         "%{prj.location}/src"
@@ -66,10 +69,12 @@ project "PathTracer"
 
     links
     {
+        "%{prj.location}/Dependencies/libs/OpenAL/OpenAL32.lib",
         "opengl32.lib",
         "GLFW",
         "GLAD",
-        "ImGUI"
+        "ImGUI",
+        "OpenAL"
     }
 
     filter "system:windows"
@@ -118,6 +123,7 @@ project "TesterProject"
         "%{IncludeDir.GLFW}",
         "%{IncludeDir.GLAD}",
         "%{IncludeDir.ImGUI}",
+        "%{IncludeDir.OpenAL}",
         "%{IncludeDir.STB}",
         "%{IncludeDir.tinyobj}",
         "%{prj.location}/src",

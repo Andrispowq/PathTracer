@@ -1,26 +1,7 @@
 #ifndef SCENE_H
 #define SCENE_H
 
-#include "engine/core/node/component/renderer/RendererComponent.h"
-#include "world/WorldLoader.h"
-
-#include "engine/core/modules/terrain/Terrain.h"
-
-#include "platform/vulkan/rendering/pipeline/VKPipeline.h"
-#include "platform/vulkan/buffer/VKMeshVertexBuffer.h"
-#include "platform/vulkan/texture/VkTexture.h"
-#include "platform/vulkan/rendering/shaders/pbr/VKPBRShader.h"
-
-#include "engine/core/modules/gui/GUIElement.h"
-#include "engine/core/modules/gui/button/GUIButton.h"
-#include "engine/core/modules/gui/slider/GUISlider.h"
-
-#include "engine/core/modules/atmosphere/Atmosphere.h"
-
 #include "engine/core/resources/AssembledAssetManager.h"
-
-#include "engine/core/modules/environmentMapRenderer/EnvironmentMapRenderer.h"
-#include "engine/core/node/component/audio/AudioComponent.h"
 
 namespace Prehistoric
 {

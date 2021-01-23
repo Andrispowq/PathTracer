@@ -282,11 +282,6 @@ namespace Prehistoric
 									_pipeline = new GLGraphicsPipeline(window, man, shader, vbo);
 									reinterpret_cast<GLGraphicsPipeline*>(_pipeline)->setBackfaceCulling(true);
 								}
-								else if (FrameworkConfig::api == Vulkan)
-								{
-									_pipeline = new VKGraphicsPipeline(window, man, shader, vbo);
-									reinterpret_cast<VKGraphicsPipeline*>(_pipeline)->setBackfaceCulling(true);
-								}
 
 								pipeline = manager->storePipeline(_pipeline);
 								pipelines.emplace(std::make_pair(compTokens[0] + "," + compTokens[1], pipeline));
@@ -295,18 +290,6 @@ namespace Prehistoric
 							RendererComponent* renderer = new RendererComponent(window, manager, pipeline, material);
 
 							obj->AddComponent(tokens[1], renderer);
-						}
-						if (tokens[1] == "Light")
-						{
-							std::vector<std::string> compTokens = Util::Split(tokens[2], ';');
-
-							Light* light = new Light();
-
-							std::vector<std::string> posTokens = Util::Split(compTokens[0], ',');
-							light->setColour({ (float)std::atof(posTokens[0].c_str()), (float)std::atof(posTokens[1].c_str()), (float)std::atof(posTokens[2].c_str()) });
-							light->setIntensity((float)std::atof(compTokens[1].c_str()));
-
-							obj->AddComponent("Light", light);
 						}
 					}
 					else
@@ -365,11 +348,6 @@ namespace Prehistoric
 											_pipeline = new GLGraphicsPipeline(window, man, shader, vbo);
 											reinterpret_cast<GLGraphicsPipeline*>(_pipeline)->setBackfaceCulling(true);
 										}
-										else if (FrameworkConfig::api == Vulkan)
-										{
-											_pipeline = new VKGraphicsPipeline(window, man, shader, vbo);
-											reinterpret_cast<VKGraphicsPipeline*>(_pipeline)->setBackfaceCulling(true);
-										}
 
 										pipeline = manager->storePipeline(_pipeline);
 										pipelines.emplace(std::make_pair(compTokens[0] + "," + compTokens[1], pipeline));
@@ -378,20 +356,6 @@ namespace Prehistoric
 									RendererComponent* renderer = new RendererComponent(window, manager, pipeline, material);
 
 									obj->AddComponent(tokens[1], renderer);
-
-									break;
-								}
-								if (tokens[1] == "Light")
-								{
-									std::vector<std::string> compTokens = Util::Split(tokens[2], ';');
-
-									Light* light = new Light();
-
-									std::vector<std::string> posTokens = Util::Split(compTokens[0], ',');
-									light->setColour({ (float)std::atof(posTokens[0].c_str()), (float)std::atof(posTokens[1].c_str()), (float)std::atof(posTokens[2].c_str()) });
-									light->setIntensity((float)std::atof(compTokens[1].c_str()));
-
-									obj->AddComponent("Light", light);
 
 									break;
 								}

@@ -1,88 +1,38 @@
 #include "Includes.hpp"
 #include "GLRenderer.h"
 
-#include "engine/core/node/component/renderer/RenderableComponent.h"
-#include "engine/core/modules/gui/GUIElement.h"
-#include "engine/core/util/ModelFabricator.h"
-
 #include "platform/opengl/rendering/pipeline/GLComputePipeline.h"
+#include "platform/opengl/rendering/pipeline/GLGraphicsPipeline.h"
 
-#include "engine/core/modules/environmentMapRenderer/EnvironmentMapRenderer.h"
-#include "engine/core/resources/AssetManager.h"
-
-#include "platform/opengl/rendering/shaders/deferred/GLAlphaCoverageShader.h"
-#include "platform/opengl/rendering/shaders/deferred/GLDeferredShader.h"
-#include "platform/opengl/rendering/shaders/deferred/GLFXAAShader.h"
+#include "platform/opengl/rendering/shaders/tracer/GLPathTracerShader.h"
 #include "platform/opengl/rendering/shaders/gui/GLGUIShader.h"
 
 namespace Prehistoric
 {
 	GLRenderer::GLRenderer(Window* window, Camera* camera, AssembledAssetManager* manager)
-		: Renderer(window, camera, manager), deferredFBO{nullptr}
+		: Renderer(window, camera, manager)
 	{
-		deferredFBO = std::make_unique<GLFramebuffer>(window);
-
-		uint32_t width = window->getWidth();
-		uint32_t height = window->getHeight();
-
-		positionMetalic = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false, true);
-		albedoRoughness = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false, true);
-		normalLit = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false, true);
-		emissionExtra = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false, true);
-
-		alphaCoverage = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false);
-		outputImage = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false);
-		fxaaTexture = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false);
-
-		deferredFBO->Bind();
-		deferredFBO->addDepthAttachment(width, height, true);
-		
-		deferredFBO->addColourAttachment2D(positionMetalic, 0);
-		deferredFBO->addColourAttachment2D(albedoRoughness, 1);
-		deferredFBO->addColourAttachment2D(normalLit, 2);
-		deferredFBO->addColourAttachment2D(emissionExtra, 3);
-
-		deferredFBO->Check();
-		deferredFBO->Unbind();
+		current_sample = 0;
 
 		AssetManager* man = manager->getAssetManager();
-		quadVBO = man->storeVertexBuffer(ModelFabricator::CreateQuad(window));
-		quadVBO.pointer->setFrontFace(FrontFace::DOUBLE_SIDED);
 
-		alphaCoverageShader = man->loadShader("alpha_coverage").value();
-		deferredShader = man->loadShader("deferred").value();
-		fxaaShader = man->loadShader("fxaa").value();
-		renderShader = man->loadShader("gui").value();
+		Vector2u dim = { window->getWidth(), window->getHeight() };
+		tracedImage = man->storeTexture(GLTexture::Storage2D(dim.x, dim.y));
 
-		alphaCoveragePipeline = new GLComputePipeline(window, man, alphaCoverageShader);
-		deferredPipeline = new GLComputePipeline(window, man, deferredShader);
-		fxaaPipeline = new GLComputePipeline(window, man, fxaaShader);
-		renderPipeline = new GLGraphicsPipeline(window, man, renderShader, quadVBO);
+		ShaderHandle traceShader = man->loadShader("rayTracing").value();
+		ShaderHandle presentShader = man->loadShader("gui").value();
 
-		static_cast<GLComputePipeline*>(alphaCoveragePipeline)->setInvocationSize({ width / 16, height / 16, 1 });
-		static_cast<GLComputePipeline*>(alphaCoveragePipeline)->addTextureBinding(0, alphaCoverage, WRITE_ONLY);
+		quadVBO = man->loadVertexBuffer(std::nullopt, "res/models/quad.obj").value();
 
-		static_cast<GLComputePipeline*>(deferredPipeline)->setInvocationSize({ width / 16, height / 16, 1 });
-		static_cast<GLComputePipeline*>(deferredPipeline)->addTextureBinding(0, outputImage, WRITE_ONLY);
+		rayTracingPipeline = manager->storePipeline(new GLComputePipeline(window, man, traceShader));
+		presentPipeline = manager->storePipeline(new GLGraphicsPipeline(window, man, presentShader, quadVBO));
 
-		static_cast<GLComputePipeline*>(fxaaPipeline)->setInvocationSize({ width / 16, height / 16, 1 });
-		static_cast<GLComputePipeline*>(fxaaPipeline)->addTextureBinding(0, fxaaTexture, WRITE_ONLY);
+		static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ dim.x / 16, dim.y / 16, 1 });
+		static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->addTextureBinding(0, tracedImage.pointer, READ_WRITE);
 	}
 
 	GLRenderer::~GLRenderer()
 	{
-		delete positionMetalic;
-		delete albedoRoughness;
-		delete normalLit;
-		delete emissionExtra;
-		
-		delete alphaCoverage;
-		delete outputImage;
-		delete fxaaTexture;
-
-		delete deferredPipeline;
-		delete fxaaPipeline;
-		delete renderPipeline;
 	}
 
 	void GLRenderer::PrepareRendering()
@@ -96,46 +46,16 @@ namespace Prehistoric
 
 			window->getSwapchain()->SetWindowSize(width, height);
 
-			//Recreate the FBO and the images
-			delete positionMetalic;
-			delete albedoRoughness;
-			delete normalLit;
-			delete emissionExtra;
+			AssetManager* man = manager->getAssetManager();
 
-			delete alphaCoverage;
-			delete outputImage;
-			delete fxaaTexture;
+			man->removeReference<Texture>(tracedImage.handle);
 
-			positionMetalic = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false, true);
-			albedoRoughness = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false, true);
-			normalLit = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false, true);
-			emissionExtra = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false, true);
+			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->removeTextureBinding(0);
+			tracedImage = man->storeTexture(GLTexture::Storage2D(width, height));
+			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ width / 16, height / 16, 1 });
+			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->addTextureBinding(0, tracedImage.pointer, WRITE_ONLY);
 
-			static_cast<GLComputePipeline*>(alphaCoveragePipeline)->removeTextureBinding(0);
-			alphaCoverage = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false);
-			static_cast<GLComputePipeline*>(alphaCoveragePipeline)->setInvocationSize({ width / 16, height / 16, 1 });
-			static_cast<GLComputePipeline*>(alphaCoveragePipeline)->addTextureBinding(0, alphaCoverage, WRITE_ONLY);
-
-			static_cast<GLComputePipeline*>(deferredPipeline)->removeTextureBinding(0);
-			outputImage = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false);
-			static_cast<GLComputePipeline*>(deferredPipeline)->setInvocationSize({ width / 16, height / 16, 1 });
-			static_cast<GLComputePipeline*>(deferredPipeline)->addTextureBinding(0, outputImage, WRITE_ONLY);
-
-			static_cast<GLComputePipeline*>(fxaaPipeline)->removeTextureBinding(0);
-			fxaaTexture = GLTexture::Storage2D(width, height, 1, R8G8B8A8_LINEAR, Bilinear, ClampToEdge, false);
-			static_cast<GLComputePipeline*>(fxaaPipeline)->setInvocationSize({ width / 16, height / 16, 1 });
-			static_cast<GLComputePipeline*>(fxaaPipeline)->addTextureBinding(0, fxaaTexture, WRITE_ONLY);
-
-			deferredFBO->Bind();
-			deferredFBO->addDepthAttachment(width, height, true);
-
-			deferredFBO->addColourAttachment2D(positionMetalic, 0);
-			deferredFBO->addColourAttachment2D(albedoRoughness, 1);
-			deferredFBO->addColourAttachment2D(normalLit, 2);
-			deferredFBO->addColourAttachment2D(emissionExtra, 3);
-
-			deferredFBO->Check();
-			deferredFBO->Unbind();
+			camera->setChanged();
 
 			//Recreate the pipelines
 			std::vector<Pipeline*> pipes = manager->get<Pipeline>();
@@ -158,108 +78,36 @@ namespace Prehistoric
 		models_3d.clear();
 		models_transparency.clear();
 		models_2d.clear();
-		lights.clear();
 	}
 
 	void GLRenderer::Render()
 	{
-		deferredFBO->Bind();
-		uint32_t arr[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
-		deferredFBO->SetDrawAttachments(4, arr);
-		deferredFBO->Clear(0.0f);
+		if (camera->isChanged())
+			current_sample = 0;
+		else
+			current_sample++;
 
-		{
-			PR_PROFILE("Cubemap pass");
-			if (FrameworkConfig::api == OpenGL)
-			{
-				EnvironmentMapRenderer::instance->RenderCube(camera);
-			}
-		}
+		Matrix4f invVP = camera->getViewProjectionMatrix().Invert();
+		Vector3f position = camera->getPosition();
 
-		{
-			PR_PROFILE("Main pass");
-			for (auto pipeline : models_3d)
-			{
-				Pipeline* pl = pipeline.first;
+		Vector4f r00 = invVP * Vector4f(-1, -1, 1, 1);
+		Vector4f r01 = invVP * Vector4f(-1, 1, 1, 1);
+		Vector4f r10 = invVP * Vector4f(1, -1, 1, 1);
+		Vector4f r11 = invVP * Vector4f(1, 1, 1, 1);
 
-				pl->BindPipeline(nullptr);
-				pl->getShader()->UpdateShaderUniforms(camera, lights);
-				pl->getShader()->UpdateSharedUniforms(pipeline.second[0]->getParent()); //Safe -> there is at least 1 element in the array
+		ray00 = r00.xyz() / r00.w - position;
+		ray01 = r01.xyz() / r01.w - position;
+		ray10 = r10.xyz() / r10.w - position;
+		ray11 = r11.xyz() / r11.w - position;
 
-				for (auto renderer : pipeline.second)
-				{
-					renderer->BatchRender();
-				}
+		rayTracingPipeline->BindPipeline(nullptr);
+		static_cast<GLPathTracerShader*>(rayTracingPipeline->getShader())->UpdateUniforms(position, ray00, ray01, ray10, ray11, current_sample);
+		rayTracingPipeline->RenderPipeline();
+		rayTracingPipeline->UnbindPipeline();
 
-				pl->UnbindPipeline();
-			}
-
-			//TODO: enable alpha blending
-			for (auto pipeline : models_transparency)
-			{
-				Pipeline* pl = pipeline.first;
-
-				pl->BindPipeline(nullptr);
-				pl->getShader()->UpdateShaderUniforms(camera, lights);
-				pl->getShader()->UpdateSharedUniforms(pipeline.second[0]->getParent()); //Safe -> there is at least 1 element in the array
-
-				for (auto renderer : pipeline.second)
-				{
-					renderer->BatchRender();
-				}
-
-				pl->UnbindPipeline();
-			}
-		}
-
-		//Render using the deferred shader
-		deferredFBO->Unbind();
-
-		{
-			PR_PROFILE("Alpha Coverage pass");
-			alphaCoveragePipeline->BindPipeline(nullptr);
-			static_cast<GLAlphaCoverageShader*>(alphaCoveragePipeline->getShader())->UpdateUniforms(this, camera, lights);
-			alphaCoveragePipeline->RenderPipeline();
-			alphaCoveragePipeline->UnbindPipeline();
-		}
-		
-		{
-			PR_PROFILE("Deferred shading pass");
-			deferredPipeline->BindPipeline(nullptr);
-			static_cast<GLDeferredShader*>(deferredPipeline->getShader())->UpdateUniforms(this, camera, lights);
-			deferredPipeline->RenderPipeline();
-			deferredPipeline->UnbindPipeline();
-		}
-
-		{
-			PR_PROFILE("FXAA pass");
-			//fxaaPipeline->BindPipeline(nullptr);
-			//static_cast<GLFXAAShader*>(fxaaPipeline->getShader())->UpdateUniforms(this, camera, lights);
-			//fxaaPipeline->RenderPipeline();
-			//fxaaPipeline->UnbindPipeline();
-		}
-
-		{
-			PR_PROFILE("Show pass");
-			renderPipeline->BindPipeline(nullptr);
-			static_cast<GLGUIShader*>(renderPipeline->getShader())->UpdateCustomUniforms(outputImage, Vector3f(-1));
-			renderPipeline->RenderPipeline();
-			renderPipeline->UnbindPipeline();
-		}
-
-		//TODO: disable alpha blending and depth testing
-		for (auto pipeline : models_2d)
-		{
-			Pipeline* pl = pipeline.first;
-
-			pl->BindPipeline(nullptr);
-
-			for (auto renderer : pipeline.second)
-			{
-				renderer->BatchRender();
-			}
-
-			pl->UnbindPipeline();
-		}
+		presentPipeline->BindPipeline(nullptr);
+		static_cast<GLGUIShader*>(presentPipeline->getShader())->UpdateCustomUniforms(tracedImage.pointer, Vector3f(-1));
+		presentPipeline->RenderPipeline();
+		presentPipeline->UnbindPipeline();
 	}
 };

@@ -1,23 +1,6 @@
 #include "Includes.hpp"
 #include "AssetManager.h"
 
-#include "platform/opengl/rendering/shaders/atmosphere/GLAtmosphereScatteringShader.h"
-#include "platform/opengl/rendering/shaders/atmosphere/GLAtmosphereShader.h"
-#include "platform/opengl/rendering/shaders/basic/GLBasicShader.h"
-#include "platform/opengl/rendering/shaders/gpgpu/GLNormalmapShader.h"
-#include "platform/opengl/rendering/shaders/gpgpu/GLSplatmapShader.h"
-#include "platform/opengl/rendering/shaders/gpgpu/GLTerrainHeightsShader.h"
-#include "platform/opengl/rendering/shaders/gui/GLGUIShader.h"
-#include "platform/opengl/rendering/shaders/pbr/GLPBRShader.h"
-#include "platform/opengl/rendering/shaders/terrain/GLTerrainShader.h"
-#include "platform/opengl/rendering/shaders/terrain/GLTerrainWireframeShader.h"
-#include "platform/opengl/rendering/shaders/deferred/GLDeferredShader.h"
-#include "platform/opengl/rendering/shaders/deferred/GLAlphaCoverageShader.h"
-#include "platform/opengl/rendering/shaders/deferred/GLFXAAShader.h"
-
-#include "platform/vulkan/rendering/shaders/basic/VKBasicShader.h"
-#include "platform/vulkan/rendering/shaders/pbr/VKPBRShader.h"
-
 namespace Prehistoric
 {
 	AssetManager::AssetManager(Window* window)

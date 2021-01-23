@@ -27,12 +27,9 @@ namespace Prehistoric
 		virtual Texture* getOutputTexture() const { return nullptr; }
 
 		void AddModel(RenderableComponent* renderable);
-		void AddLight(Light* light);
 
 		Window* getWindow() const { return window; }
 		Camera* getCamera() const { return camera; }
-
-		inline std::vector<Light*> getLights() const { return lights; }
 
 		inline bool isWireframeMode() const { return wireframeMode; }
 		inline void setWireframeMode(bool wire) { this->wireframeMode = wire; }
@@ -47,8 +44,6 @@ namespace Prehistoric
 		std::unordered_map<Pipeline*, std::vector<RenderableComponent*>> models_3d;
 		std::unordered_map<Pipeline*, std::vector<RenderableComponent*>> models_transparency;
 		std::unordered_map<Pipeline*, std::vector<RenderableComponent*>> models_2d;
-
-		std::vector<Light*> lights;
 
 		bool wireframeMode;
 	};

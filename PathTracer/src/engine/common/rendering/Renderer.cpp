@@ -47,9 +47,4 @@ namespace Prehistoric
 			break;
 		}
 	}
-
-	void Renderer::AddLight(Light* light)
-	{
-		lights.push_back(light);
-	}
 };

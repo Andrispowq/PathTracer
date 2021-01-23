@@ -13,6 +13,6 @@ namespace Prehistoric
 
 	void Light::PreRender(Renderer* renderer)
 	{
-		renderer->AddLight(this);
+		//renderer->AddLight(this);
 	}
 };

@@ -2,10 +2,7 @@
 #include "WindowsWindow.h"
 
 #include "platform/opengl/framework/context/GLContext.h"
-#include "platform/vulkan/framework/context/VKContext.h"
-
 #include "platform/opengl/framework/swapchain/GLSwapchain.h"
-#include "platform/vulkan/framework/swapchain/VKSwapchain.h"
 
 #include "WindowsInput.h"
 
@@ -112,11 +109,6 @@ namespace Prehistoric
 		{
 			context = std::make_unique<GLContext>(this);
 			swapchain = std::make_unique<GLSwapchain>(this);
-		}
-		else if (FrameworkConfig::api == Vulkan)
-		{
-			context = std::make_unique<VKContext>(this);
-			swapchain = std::make_unique<VKSwapchain>(this);
 		}
 
 		//Input is static so we can use it in the callbacks, but window is not, so we need a way to get it

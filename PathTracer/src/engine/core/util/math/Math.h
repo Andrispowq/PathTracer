@@ -406,6 +406,8 @@ namespace Prehistoric
 		static Matrix4f PerspectiveProjection(const float& fov, const float& aspectRatio, const float& nearPlane, const float& farPlane);
 		static Matrix4f View(const Vector3f& forward, const Vector3f& up);
 
+		Matrix4f Invert() const;
+
 		std::array<float, 4> const getRow(int i) const;
 
 		void print() const
@@ -423,6 +425,9 @@ namespace Prehistoric
 			}
 		}
 	private:
+		float Get(int x, int y) const;
+		void Set(int x, int y, float val);
+
 		void clear();
 	public:
 		union
@@ -893,6 +898,8 @@ namespace Prehistoric
 		static Matrix4f PerspectiveProjection(const float& fov, const float& aspectRatio, const float& nearPlane, const float& farPlane);
 		static Matrix4f View(const Vector3f& forward, const Vector3f& up);
 
+		Matrix4f Invert() const;
+
 		std::array<float, 4> const getRow(const int i) const;
 
 		void print() const
@@ -910,6 +917,9 @@ namespace Prehistoric
 			}
 		}
 	private:
+		float Get(int x, int y) const;
+		void Set(int x, int y, float val);
+
 		void clear();
 	public:
 		float* m;

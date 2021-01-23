@@ -5,7 +5,6 @@
 #include "engine/common/buffer/MeshVertexBuffer.h"
 
 #include "platform/opengl/buffer/GLMeshVertexBuffer.h"
-#include "platform/vulkan/buffer/VKMeshVertexBuffer.h"
 #include "platform/opengl/buffer/GLPatchVertexBuffer.h"
 //#include "platform/vulkan/buffer/VKPatchVertexBuffer.h"
 

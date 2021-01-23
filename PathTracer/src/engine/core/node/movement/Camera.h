@@ -41,6 +41,7 @@ namespace Prehistoric
         inline void setSpeedControl(InputData data) { this->speedControl = data; }
 
         bool isChanged() const { return cameraMoved || cameraRotated; }
+        void setChanged() { this->cameraMoved = true; }
     private:
         std::vector<CameraInput> inputs;
         InputData speedControl;

@@ -10,14 +10,7 @@
 #include "engine/core/node/component/renderer/RendererComponent.h"
 #include "engine/core/model/obj/OBJLoader.h"
 
-#include "platform/opengl/rendering/shaders/basic/GLBasicShader.h"
-#include "platform/vulkan/rendering/shaders/basic/VKBasicShader.h"
-
-#include "platform/opengl/rendering/shaders/pbr/GLPBRShader.h"
-#include "platform/vulkan/rendering/shaders/pbr/VKPBRShader.h"
-
 #include "platform/opengl/rendering/pipeline/GLGraphicsPipeline.h"
-#include "platform/vulkan/rendering/pipeline/VKGraphicsPipeline.h"
 
 #include "engine/core/resources/AssembledAssetManager.h"
 

@@ -5,8 +5,6 @@
 #include "engine/common/rendering/pipeline/GraphicsPipeline.h"
 #include "engine/common/rendering/pipeline/ComputePipeline.h"
 
-#include "platform/vulkan/rendering/shaders/VKShader.h"
-
 #include "engine/core/resources/AssembledAssetManager.h"
 
 namespace Prehistoric

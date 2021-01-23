@@ -62,7 +62,6 @@ namespace Prehistoric
 
 	class GameObject;
 	class Camera;
-	class Light;
 
 	class Shader
 	{
@@ -94,15 +93,6 @@ namespace Prehistoric
 		virtual void SetUniform(const std::string& name, const void* value, size_t size, size_t offset = 0, uint32_t instance_index = 0) const = 0;
 
 		virtual void BindUniformBlock(const std::string& name, uint32_t binding, uint32_t instance_index = 0) const = 0;
-
-		//Constant uniforms -> uniforms that change very infrequently
-		//Shader uniforms -> per-shader uniforms, like view and projection matrices
-		//Shared uniforms -> uniforms that are shared between objects, and can be fetched from the first object
-		//Object uniforms -> unique, per-object values
-		virtual void UpdateConstantUniforms(Camera* camera, const std::vector<Light*>& lights) const {}
-		virtual void UpdateShaderUniforms(Camera* camera, const std::vector<Light*>& lights, uint32_t instance_index = 0) const {}
-		virtual void UpdateSharedUniforms(GameObject* object, uint32_t instance_index = 0) const {}
-		virtual void UpdateObjectUniforms(GameObject* object, uint32_t instance_index = 0) const {}
 
 		Shader(const Shader&) = delete;
 		Shader(const Shader&&) = delete;
