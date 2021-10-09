@@ -13,7 +13,7 @@ namespace Prehistoric
 		GLPathTracerShader();
 		virtual ~GLPathTracerShader() {}
 
-		void UpdateUniforms(Vector3f eye, Vector3f ray00, Vector3f ray01, Vector3f ray10, Vector3f ray11, int spp) const;
+		void UpdateUniforms(Camera* camera, int spp) const;
 	};
 };
 

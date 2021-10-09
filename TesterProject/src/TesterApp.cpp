@@ -11,13 +11,13 @@ TesterApp::TesterApp()
 {
 	using namespace Prehistoric;
 
-	GameObject* audio = new GameObject();
-	audio->AddComponent(AUDIO_COMPONENT, new AudioComponent("res/sounds/_FlipReset.wav", 57.0f));
-	audio->GetComponent<AudioComponent>()->PreUpdate(engineLayer);
+	//GameObject* audio = new GameObject();
+	//audio->AddComponent(AUDIO_COMPONENT, new AudioComponent("res/sounds/_Closer.wav", 75.0f));
+	//audio->GetComponent<AudioComponent>()->PreUpdate(engineLayer);
 
-	engineLayer->getRootObject()->AddChild("audio", audio);
+	//engineLayer->getRootObject()->AddChild("audio", audio);
 
-	engineLayer->getAudioEngine()->Update(0.0f);
+	//engineLayer->getAudioEngine()->Update(0.0f);
 
 	//Load in the environment map
 	if (FrameworkConfig::api == OpenGL)
