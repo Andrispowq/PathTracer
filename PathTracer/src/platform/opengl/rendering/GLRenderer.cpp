@@ -27,7 +27,7 @@ namespace Prehistoric
 		rayTracingPipeline = manager->storePipeline(new GLComputePipeline(window, man, traceShader));
 		presentPipeline = manager->storePipeline(new GLGraphicsPipeline(window, man, presentShader, quadVBO));
 
-		static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ dim.x / 16, dim.y / 16, 1 });
+		static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ dim.x / 32, dim.y / 32, 1 });
 		static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->addTextureBinding(0, tracedImage.pointer, READ_WRITE);
 	}
 
@@ -52,7 +52,7 @@ namespace Prehistoric
 
 			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->removeTextureBinding(0);
 			tracedImage = man->storeTexture(GLTexture::Storage2D(width, height));
-			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ width / 16, height / 16, 1 });
+			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ width / 32, height / 32, 1 });
 			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->addTextureBinding(0, tracedImage.pointer, WRITE_ONLY);
 
 			camera->setChanged();
@@ -82,26 +82,31 @@ namespace Prehistoric
 
 	void GLRenderer::Render()
 	{
-		if (camera->isChanged())
-			current_sample = 0;
-		else
-			current_sample++;
-
-		Matrix4f invVP = camera->getViewProjectionMatrix().Invert();
 		Vector3f position = camera->getPosition();
 
-		Vector4f r00 = invVP * Vector4f(-1, -1, 1, 1);
-		Vector4f r01 = invVP * Vector4f(-1, 1, 1, 1);
-		Vector4f r10 = invVP * Vector4f(1, -1, 1, 1);
-		Vector4f r11 = invVP * Vector4f(1, 1, 1, 1);
+		if (camera->isChanged() || (current_sample == 0))
+		{
+			current_sample = 1;
 
-		ray00 = r00.xyz() / r00.w - position;
-		ray01 = r01.xyz() / r01.w - position;
-		ray10 = r10.xyz() / r10.w - position;
-		ray11 = r11.xyz() / r11.w - position;
+			Matrix4f invVP = camera->getViewProjectionMatrix().Invert();
+
+			Vector4f r00 = invVP * Vector4f(-1, -1, 1, 1);
+			Vector4f r01 = invVP * Vector4f(-1, 1, 1, 1);
+			Vector4f r10 = invVP * Vector4f(1, -1, 1, 1);
+			Vector4f r11 = invVP * Vector4f(1, 1, 1, 1);
+
+			ray00 = r00.xyz() / r00.w - position;
+			ray01 = r01.xyz() / r01.w - position;
+			ray10 = r10.xyz() / r10.w - position;
+			ray11 = r11.xyz() / r11.w - position;
+		}
+		else
+		{
+			current_sample++;
+		}
 
 		rayTracingPipeline->BindPipeline(nullptr);
-		static_cast<GLPathTracerShader*>(rayTracingPipeline->getShader())->UpdateUniforms(position, ray00, ray01, ray10, ray11, current_sample);
+		static_cast<GLPathTracerShader*>(rayTracingPipeline->getShader())->UpdateUniforms(camera, current_sample);
 		rayTracingPipeline->RenderPipeline();
 		rayTracingPipeline->UnbindPipeline();
 

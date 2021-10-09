@@ -36,8 +36,11 @@ namespace Prehistoric
 
 		if (FrameworkConfig::api == OpenGL)
 		{
-			camera = std::make_unique<Camera>(5.0f, 50.0f, 0.8f, 80.0f, Vector3f(0, 3.0, 0));
-			camera->RotateX(20);
+			camera = std::make_unique<Camera>(5.0f, 50.0f, 0.8f, 80.0f, Vector3f(3.5, 2.7, 7.3));
+			camera->RotateX(0);
+			camera->RotateY(0);
+
+			camera->Update(window.get(), 0.0f);
 		}
 
 		camera->AddCameraInput(keyInput);

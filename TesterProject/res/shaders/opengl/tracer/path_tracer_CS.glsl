@@ -2,390 +2,372 @@
 
 precision highp float;
 
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(binding = 0, rgba32f) uniform image2D tracedImage;
 
-#define PI 3.14159265359
-#define TWO_PI 6.28318530718
-#define ONE_OVER_PI (1.0 / PI)
-#define ONE_OVER_2PI (1.0 / TWO_PI)
-#define LARGE_FLOAT 1E+10
-#define NUM_BOXES 11//17
+#define FLOAT_MAX 3.4028235e+38
+#define FLOAT_MIN -3.4028235e+38
+#define PI 3.1415926535898
+
+#define NUM_BOXES 15//20
 #define NUM_SPHERES 1
 #define EPSILON 1E-4
 #define LIGHT_INTENSITY 10.0
 #define BACKGROUND_INTENSITY 2.0
-#define PROBABILITY_OF_LIGHT_SAMPLE 0.5
 #define SKY_COLOUR vec3(0.89, 0.96, 1.00)
 #define LIGHT_DIRECTION vec3(0.0, 1.0, 0.0)
 
-#define MAX_BOUNCES 5
-#define MULTI_SAMPLE_AT_ONCE 1
-#define SAMPLES_PER_INVOCATION 32
+uniform samplerCube environment; 
 
-uniform samplerCube environment;
+uniform mat4 Projection;
+uniform mat4 InvProjection;
+uniform vec2 NearFar;
+uniform mat4 View;
+uniform mat4 InvView;
+uniform mat4 ProjectionView;
+uniform vec3 ViewPos;
+uniform vec3 ViewDir;
 
-uniform vec3 eye;
-uniform vec3 ray00;
-uniform vec3 ray01;
-uniform vec3 ray10;
-uniform vec3 ray11;
-
-uniform float time_;
-uniform int current_spp_;
+uniform int current_spp;
 uniform float blendFactor;
+
+struct Material
+{
+	vec3 Albedo;
+	float SpecularChance;
+
+	vec3 Emissive;
+	float SpecularRoughness;
+
+	vec3 Absorbance;
+	float RefractionChance;
+
+	float RefractionRoughness;
+	float IOR;
+};
 
 struct Box 
 {
-	vec3 min;
-	vec3 max;
-	vec3 albedo;
-	float metallic;
-	float roughness;
-	vec3 emission;
+	vec3 Min;
+	vec3 Max;
+
+	Material Material;
 };
 
 const Box boxes[NUM_BOXES] = 
 {
-	{vec3(-5.0, -0.1, -5.0), vec3(5.0, 0.0,  5.0), vec3(0.50, 0.45, 0.33), 0.0, 0.1, vec3(0.0)}, // <- floor
-	//{vec3(-5.0,  5.1, -5.0), vec3(5.0, 5.0,  5.0), vec3(0.00, 0.45, 0.33), 0.0, 1.0, vec3(0.0)}, // <- top
-	//{vec3(-5.1,  0.0, -5.0), vec3(-5.0, 5.0,  5.0), vec3(0.4, 0.4, 0.4), 0.2, 0.4, vec3(0.0)}, // <- left wall
-	//{vec3(5.0,  0.0, -5.0), vec3(5.1, 5.0,  5.0), vec3(0.4, 0.4, 0.4), 0.0, 1.0, vec3(0.0)}, // <- right wall
+	{vec3(-5.0, -0.1, -5.0), vec3(5.0, 0.0,  5.0), { vec3(1.0), 0.1, vec3(0.0), 0.0, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- floor
+	{vec3(-5.0,  5.1, -5.0), vec3(5.0, 5.0,  5.0), { vec3(0.00, 0.45, 0.33), 0.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- top
+	{vec3(-5.1,  0.0, -5.0), vec3(-5.0, 5.0,  5.0), { vec3(0.5, 0.2, 0.09), 0.2, vec3(0.0), 0.3, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- left wall
+	{vec3(5.0,  0.0, -5.0), vec3(5.1, 5.0,  5.0), { vec3(0.4, 0.4, 0.4), 0.2, vec3(0.0), 0.2, vec3(0.0), 0.8, 0.2, 1.1 }}, // <- right wall
 	//
-	//{vec3( 5.0,  0.0,  5.0), vec3( 5.1, 5.0,  3.0), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0)}, // <- right wall - left
-	//{vec3( 5.0,  0.0,  1.5), vec3( 5.1, 5.0, -2.0), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0)}, // <- right wall - middle
-	//{vec3( 5.0,  3.0,  3.0), vec3( 5.1, 5.0,  1.5), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0)}, // <- right wall - door top
-	//{vec3( 5.0,  0.0, -3.5), vec3( 5.1, 5.0, -5.0), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0)}, // <- right wall - right
-	//{vec3( 5.0,  0.0, -2.0), vec3( 5.1, 2.5, -3.5), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0)}, // <- right wall - top
-	//{vec3( 5.0,  3.8, -2.0), vec3( 5.1, 5.0, -3.5), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0)}, // <- right wall - bottom
+	//{vec3( 5.0,  0.0,  5.0), vec3( 5.1, 5.0,  3.0), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - left
+	//{vec3( 5.0,  0.0,  1.5), vec3( 5.1, 5.0, -2.0), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - middle
+	//{vec3( 5.0,  3.0,  3.0), vec3( 5.1, 5.0,  1.5), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - door top
+	//{vec3( 5.0,  0.0, -3.5), vec3( 5.1, 5.0, -5.0), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - right
+	//{vec3( 5.0,  0.0, -2.0), vec3( 5.1, 2.5, -3.5), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - top
+	//{vec3( 5.0,  3.8, -2.0), vec3( 5.1, 5.0, -3.5), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - bottom
 	//
-	{vec3(-5.0,  0.0, -5.1), vec3(5.0, 5.0, -5.0), vec3(0.43, 0.52, 0.27), 0.0, 1.0, vec3(0.0)}, // <- back wall
-	{vec3(-5.0,  0.0,  5.0), vec3(5.0, 5.0,  5.1), vec3(0.5, 0.2, 0.09), 0.0, 0.2, vec3(0.0)}, // <- front wall
-	{vec3(-1.0,  1.0, -1.0), vec3(1.0, 1.1,  1.0), vec3(0.3, 0.23, 0.15), 0.1, 0.6, vec3(0.0)}, // <- table top
-	{vec3(-1.0,  0.0, -1.0), vec3(-0.8, 1.0, -0.8), vec3(0.4, 0.3, 0.15), 0.1, 0.4, vec3(0.0)}, // <- table foot
-	{vec3(-1.0,  0.0,  0.8), vec3(-0.8, 1.0,  1.0), vec3(0.4, 0.3, 0.15), 0.1, 0.4, vec3(0.0)}, // <- table foot
-	{vec3(0.8,  0.0, -1.0), vec3(1.0, 1.0, -0.8), vec3(0.4, 0.3, 0.15), 0.1, 0.4, vec3(0.0)}, // <- table foot
-	{vec3(0.8,  0.0,  0.8), vec3(1.0, 1.0,  1.0), vec3(0.4, 0.3, 0.15), 0.1, 0.4, vec3(0.0)}, // <- table foot
-	{vec3(3.0,  0.0, -4.9), vec3(3.3, 2.0, -4.6), vec3(0.6, 0.6, 0.6), 1.0, 0.2, vec3(0.0)},  // <- some "pillar"
+	{vec3(-5.0,  0.0, -5.1), vec3(5.0, 5.0, -5.0), { vec3(0.43, 0.52, 0.27), 0.2, vec3(0.0), 1.0, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- back wall
+	{vec3(-5.0,  0.0,  5.0), vec3(5.0, 5.0,  5.1), { vec3(0.5, 0.2, 0.09), 0.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- front wall
+	{vec3(-1.0,  1.0, -1.0), vec3(1.0, 1.1,  1.0), { vec3(0.3, 0.23, 0.15), 0.1, vec3(0.0), 0.6, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- table top
+	{vec3(-1.0,  0.0, -1.0), vec3(-0.8, 1.0, -0.8), { vec3(0.4, 0.3, 0.15), 0.1, vec3(0.0), 0.4, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- table foot
+	{vec3(-1.0,  0.0,  0.8), vec3(-0.8, 1.0,  1.0), { vec3(0.4, 0.3, 0.15), 0.1, vec3(0.0), 0.4, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- table foot
+	{vec3(0.8,  0.0, -1.0), vec3(1.0, 1.0, -0.8), { vec3(0.4, 0.3, 0.15), 0.1, vec3(0.0), 0.4, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- table foot
+	{vec3(0.8,  0.0,  0.8), vec3(1.0, 1.0,  1.0), { vec3(0.4, 0.3, 0.15), 0.1, vec3(0.0), 0.4, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- table foot
+	{vec3(3.0,  0.0, -4.9), vec3(3.3, 2.0, -4.6), { vec3(0.6, 0.6, 0.6), 1.0, vec3(0.0), 0.1, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "pillar"
 	//{vec3(-4.8,  4.9, -4.7), vec3( 4.8, 5.0, -4.8), vec3(1.0, 1.0, 1.0), 1.0, 0.2, vec3(5.0, 0, 0)},  // <- some "LED"
 	//{vec3(-4.8,  4.9,  4.7), vec3( 4.8, 5.0,  4.8), vec3(1.0, 1.0, 1.0), 1.0, 0.2, vec3(0, 5.0, 0)},  // <- some "LED"
 	//{vec3(-4.7,  4.9, -4.8), vec3(-4.8, 5.0,  4.8), vec3(1.0, 1.0, 1.0), 1.0, 0.2, vec3(0, 0, 5.0)},  // <- some "LED"
 	//{vec3( 4.7,  4.9, -4.8), vec3( 4.8, 5.0,  4.8), vec3(1.0, 1.0, 1.0), 1.0, 0.2, vec3(5.0, 5.0, 0)},  // <- some "LED"
-	{vec3(-2.0,  2.5, -4.9), vec3(2.0, 3.0, -5.0), vec3(1.0, 1.0, 1.0), 1.0, 0.2, vec3(10.0)},  // <- Big LED
-	{vec3(0.0,  0.5,  4.9), vec3(1.5, 3.5,  5.0), vec3(1.0, 1.0, 1.0), 1.0, 0.05, vec3(0.0)},  // <- Big mirror
+	{vec3(-2.0,  2.5, -4.9), vec3(2.0, 3.0, -5.0), { vec3(1.0, 1.0, 1.0), 1.0, vec3(10.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big LED
+	{vec3(9.0,  2.5, -0.5), vec3(10.0, 3.5, 0.5), { vec3(1.0, 1.0, 1.0), 1.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big glass
+	{vec3(-0.2, 1.1, -0.01), vec3(0.2, 2.0, 0.01), { vec3(0.56, 0.57, 0.58), 1.0, vec3(0.0), 0.05, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big mirror
 };
 
 struct HitInfo 
 {
-	vec3 normal;
-	float near;
-	int index;
+    float T;
+	bool FromInside;
+	vec3 NearHitPos;
+	vec3 Normal;
+
+	Material Material;
 };
 
 struct Ray
 {
-	vec3 origin;
-	vec3 direction;
+	vec3 Origin;
+	vec3 Direction;
 };
 
-ivec2 pixel;
-float time;
-int _current_spp;
+vec3 Radiance(Ray ray);
+bool GetClosestIntersectingRayObject(Ray ray, out HitInfo hitInfo);
+bool RayCuboidIntersect(Ray ray, vec3 aabbMin, vec3 aabbMax, out float t1, out float t2);
+vec3 GetNormal(vec3 spherePos, float radius, vec3 surfacePosition);
+vec3 GetNormal(vec3 aabbMin, vec3 aabbMax, vec3 surfacePosition);
+vec3 GetCosWeightedHemissphereDir(inout uint rndSeed, vec3 normal);
+vec2 GetPointOnCircle(inout uint rndSeed);
+uint GetPCGHash(inout uint seed);
+float GetRandomFloat01(inout uint state);
+float GetSmallestPositive(float t1, float t2);
+float FresnelSchlick(float cosTheta, float n1, float n2);
+Ray GetWorldSpaceRay(mat4 inverseProj, mat4 inverseView, vec3 viewPos, vec2 normalizedDeviceCoords);
 
-vec2 IntersectBox(Ray ray, const Box box, out vec3 normal);
-bool IntersectObjects(Ray ray, out HitInfo info);
-vec3 randvec3(int seed);
-vec3 brdfSpecular(vec3 lightInDir, vec3 lightOutDir, vec3 normal, vec3 F0, float roughness, float metallic);
-vec3 brdfDiffuse(vec3 albedo, vec3 lightInDir, vec3 lightOutDir, vec3 normal);
-vec3 brdf(vec3 albedo, vec3 lightInDir, vec3 lightOutDir, vec3 normal, vec3 kD, vec3 F0, float roughness, float metallic);
+uniform int rayDepth = 15;
+uniform int SSP = 50;
 
-float DistributionGGX(vec3 N, vec3 H, float roughness);
-float GeometrySchlickGGX(float NdotV, float roughness);
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
-vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness);
-vec3 FresnelSchlick(float cosTheta, vec3 F0);
+uniform float focalLength = 5.0;
+uniform float apertureDiameter = 0.14;
 
-vec3 random3(vec3 f);
-vec4 randomHemispherePoint(vec3 n, vec2 rand);
-float hemisphereProbability(vec3 n, vec3 v);
-vec4 randomDiskPoint(vec3 n, float d, float r, vec2 rand);
-float diskProbability(vec3 n, float d, float r, vec3 v);
-
-vec3 Trace(vec3 origin, vec3 direction) 
-{
-	HitInfo info;
-	Ray ray = { origin, direction };
-	
-	vec3 attenuation = vec3(1.0);
-	for (int i = 0; i < MAX_BOUNCES; i++)
-	{
-		if (!IntersectObjects(ray, info))
-		{
-			//return SKY_COLOUR * BACKGROUND_INTENSITY * attenuation;
-			return texture(environment, normalize(ray.direction)).rgb * attenuation;
-		}
-
-		vec3 rand = randvec3(i);
-
-		Box box = boxes[info.index];
-		vec3 normal = info.normal;
-		vec3 albedo = box.albedo;
-		float roughness = box.roughness;
-		float metallic = box.metallic;
-		vec3 emission = box.emission;
-
-		if (emission.r != 0 || emission.g != 0 || emission.b != 0)
-			return attenuation * emission;
-
-		vec4 samplePDF = randomHemispherePoint(normal, rand.xy);
-		vec3 point = ray.origin + info.near * ray.direction;
-		ray.origin = point + normal * EPSILON;
-		ray.direction = samplePDF.xyz;
-
-		vec3 F0 = vec3(0.04);
-		F0 = mix(F0, albedo, metallic);
-		vec3 F = FresnelSchlickRoughness(max(dot(normal, -direction), 0), F0, roughness);
-
-		vec3 kS = F;
-		vec3 kD = 1.0 - kS;
-		kD *= 1.0 - metallic;
-
-		attenuation *= brdf(albedo, samplePDF.xyz, -direction, normal, kD, F0, roughness, metallic);
-		attenuation *= max(dot(ray.direction, normal), 0.0);
-
-		if (samplePDF.w > 0.0)
-		{
-			attenuation /= max(samplePDF.w, 0.0001);
-		}
-	};
-	
-	return vec3(0.0);
-}
-
+uint rndSeed;
 void main(void) 
 {
-	pixel = ivec2(gl_GlobalInvocationID.xy);
-	ivec2 size = imageSize(tracedImage);
+	ivec2 imgResultSize = imageSize(tracedImage);
+	ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
 
-	time = time_;
-	_current_spp = current_spp_;
-
-	if (any(greaterThanEqual(pixel, size)))
-		return;
-		
-	vec2 point = (vec2(pixel) + vec2(0.5)) / vec2(size);
-	vec3 dir = mix(mix(ray00, ray01, point.y), mix(ray10, ray11, point.y), point.x);
-
-	if (MULTI_SAMPLE_AT_ONCE != 0)
+	rndSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + current_spp * 2699 | 1;
+	vec3 colour = vec3(0);
+	for (int i = 0; i < SSP; i++)
 	{
-		vec3 oldColour = _current_spp < 2 ? vec3(0.0) : imageLoad(tracedImage, pixel).rgb;
-		vec3 final = oldColour;
+		vec2 subPixelOffset = vec2(GetRandomFloat01(rndSeed), GetRandomFloat01(rndSeed)) - 0.5; // integrating over whole pixel eliminates aliasing
+		vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
+		Ray rayEyeToWorld = GetWorldSpaceRay(InvProjection, InvView, ViewPos, ndc);
 
-		for (int i = 0; i < SAMPLES_PER_INVOCATION; i++)
-		{
-			_current_spp = i + current_spp_ * SAMPLES_PER_INVOCATION;
-			vec3 colour = Trace((eye), normalize(dir));
-			final = _current_spp < 2 ? colour : mix(colour, final, (_current_spp) / (_current_spp + 1.0));
-			time += 0.01;
-		}
+		vec3 focalPoint = rayEyeToWorld.Origin + rayEyeToWorld.Direction * focalLength;
+		vec2 offset = apertureDiameter * 0.5 * GetPointOnCircle(rndSeed);
 
-		imageStore(tracedImage, pixel, vec4(final, 1.0));
-	}
-	else
-	{
-		vec3 colour = Trace(eye, normalize(dir));
-		vec3 oldColour;
+		rayEyeToWorld.Origin = (InvView * vec4(offset, 0.0, 1.0)).xyz;
+		rayEyeToWorld.Direction = normalize(focalPoint - rayEyeToWorld.Origin);
 
-		if (blendFactor > 0.0)
-		{
-			oldColour = imageLoad(tracedImage, pixel).rgb;
-		}
-
-		vec3 finalColour = mix(colour, oldColour, blendFactor);
-		imageStore(tracedImage, pixel, vec4(finalColour, 1.0));
-	}
-}
-
-vec2 IntersectBox(Ray ray, const Box box, out vec3 normal)
-{
-	vec3 tMin = (box.min - ray.origin) / ray.direction;
-	vec3 tMax = (box.max - ray.origin) / ray.direction;
-
-	vec3 t1 = min(tMin, tMax);
-	vec3 t2 = max(tMin, tMax);
-
-	float tNear = max(max(t1.x, t1.y), t1.z);
-	float tFar = min(min(t2.x, t2.y), t2.z);
-
-	normal = vec3(equal(t1, vec3(tNear))) * sign(-ray.direction);
-
-	return vec2(tNear, tFar);
-}
-
-bool IntersectObjects(Ray ray, out HitInfo info)
-{
-	float smallest = LARGE_FLOAT;
-	bool found = false;
-	vec3 normal;
-
-	for (int i = 0; i < NUM_BOXES; i++)
-	{
-		vec2 lambda = IntersectBox(ray, boxes[i], normal);
-		if (lambda.y >= 0.0 && lambda.x < lambda.y && lambda.x < smallest)
-		{
-			info.near = lambda.x;
-			info.index = i;
-			info.normal = normal;
-			smallest = lambda.x;
-			found = true;
-		}
+        colour += Radiance(rayEyeToWorld);
 	}
 
-	return found;
+	colour /= SSP;
+
+    if (current_spp > 1)
+    {
+        vec3 lastFrameColour = imageLoad(tracedImage, imgCoord).rgb;
+        colour = mix(lastFrameColour, colour, 1.0 / (current_spp + 1));
+    }
+
+	imageStore(tracedImage, imgCoord, vec4(colour, 1.0));
 }
 
-vec3 randvec3(int seed)
+vec3 Radiance(Ray ray)
 {
-	return random3(vec3(pixel + ivec2(seed), time));
+    vec3 throughPut = vec3(1);
+    vec3 ret = vec3(0);
+    HitInfo hitInfo;
+    for (int i = 0; i < rayDepth; i++)
+    {
+        if (GetClosestIntersectingRayObject(ray, hitInfo))
+        {
+            if (hitInfo.FromInside)
+            {
+                hitInfo.Normal *= -1.0;
+                throughPut *= exp(-hitInfo.Material.Absorbance * hitInfo.T);
+            }
+
+            float specularChance = hitInfo.Material.SpecularChance;
+            float refractionChance = hitInfo.Material.RefractionChance;
+            if (specularChance > 0.0)
+            {
+                specularChance = mix(specularChance, 1.0, FresnelSchlick(-dot(ray.Direction, hitInfo.Normal), hitInfo.FromInside ? hitInfo.Material.IOR : 1.0, !hitInfo.FromInside ? hitInfo.Material.IOR : 1.0));
+                float diffuseChance = (1.0 - (specularChance + refractionChance));
+                refractionChance = (1.0 - (diffuseChance + specularChance));
+            }
+
+            float rayProbability = 1.0;
+            float doSpecular = 0.0;
+            float doRefraction = 0.0;
+            float raySelectRoll = GetRandomFloat01(rndSeed);
+
+            if (specularChance > raySelectRoll)
+            {
+                doSpecular = 1.0;
+                rayProbability = specularChance;
+            }
+            else if (specularChance + refractionChance > raySelectRoll)
+            {
+                doRefraction = 1.0;
+                rayProbability = refractionChance;
+            }
+            else
+            {
+                rayProbability = 1.0 - (specularChance + refractionChance);
+            }
+
+            vec3 diffuseRayDir = GetCosWeightedHemissphereDir(rndSeed, hitInfo.Normal);
+            vec3 specularRayDir = normalize(mix(reflect(ray.Direction, hitInfo.Normal), diffuseRayDir, hitInfo.Material.SpecularRoughness * hitInfo.Material.SpecularRoughness));
+            vec3 refractionRayDir = refract(ray.Direction, hitInfo.Normal, hitInfo.FromInside ? hitInfo.Material.IOR / 1.0 : 1.0 / hitInfo.Material.IOR);
+            refractionRayDir = normalize(mix(refractionRayDir, GetCosWeightedHemissphereDir(rndSeed, -hitInfo.Normal), hitInfo.Material.RefractionRoughness * hitInfo.Material.RefractionRoughness));
+
+            ray.Origin = hitInfo.NearHitPos + hitInfo.Normal * EPSILON * (doRefraction == 1.0 ? -1 : 1);
+            ray.Direction = mix(diffuseRayDir, specularRayDir, doSpecular);
+            ray.Direction = mix(ray.Direction, refractionRayDir, doRefraction);
+
+            ret += hitInfo.Material.Emissive * throughPut;
+            if (doRefraction == 0.0)
+                throughPut *= hitInfo.Material.Albedo;
+
+            rayProbability = max(rayProbability, EPSILON);
+            throughPut /= rayProbability;
+
+
+            float p = max(throughPut.x, max(throughPut.y, throughPut.z));
+            if (GetRandomFloat01(rndSeed) > p)
+                break;
+
+            throughPut *= 1.0 / p;
+        }
+        else
+        {
+            ret += texture(environment, ray.Direction).rgb * throughPut;
+            break;
+        }
+    }
+
+    return ret;
 }
 
-vec3 brdfSpecular(vec3 lightInDir, vec3 lightOutDir, vec3 normal, vec3 F0, float roughness, float metallic)
+bool GetClosestIntersectingRayObject(Ray ray, out HitInfo hitInfo)
 {
-	//normal -> N, lightInDir -> L, lightOutDir -> V
-	vec3 H = normalize(lightInDir + lightOutDir);
+    hitInfo.T = FLOAT_MAX;
+    float t1, t2;
 
-	float NDF = DistributionGGX(normal, H, roughness);
-	float G = GeometrySmith(normal, lightOutDir, lightInDir, roughness);
-	vec3 F = FresnelSchlick(max(dot(H, lightOutDir), 0), F0);
+    /*for (int i = 0; i < NUM_SPHERES; i++)
+    {
+        vec3 pos = gameObjectsUBO.Spheres[i].Position;
+        float radius = gameObjectsUBO.Spheres[i].Radius;
+        if (RaySphereIntersect(ray, pos, radius, t1, t2) && t2 > 0 && t1 < hitInfo.T)
+        {
+            hitInfo.T = GetSmallestPositive(t1, t2);
+            hitInfo.FromInside = hitInfo.T == t2;
+            hitInfo.Material = gameObjectsUBO.Spheres[i].Material;
+            hitInfo.NearHitPos = ray.Origin + ray.Direction * hitInfo.T;
+            hitInfo.Normal = GetNormal(pos, radius, hitInfo.NearHitPos);
+        }
+    }*/
 
-	vec3 kS = F;
-	vec3 kD = vec3(1) - kS;
-	kD *= 1 - metallic;
+    for (int i = 0; i < NUM_BOXES; i++)
+    {
+        vec3 aabbMin = boxes[i].Min;
+        vec3 aabbMax = boxes[i].Max;
+        if (RayCuboidIntersect(ray, aabbMin, aabbMax, t1, t2) && t2 > 0 && t1 < hitInfo.T)
+        {
+            hitInfo.T = GetSmallestPositive(t1, t2);
+            hitInfo.FromInside = hitInfo.T == t2;
+            hitInfo.Material = boxes[i].Material;
+            hitInfo.NearHitPos = ray.Origin + ray.Direction * hitInfo.T;
+            hitInfo.Normal = GetNormal(aabbMin, aabbMax, hitInfo.NearHitPos);
+        }
+    }
 
-	vec3 numerator = NDF * G * F;
-	float denominator = 4 * max(dot(normal, lightOutDir), 0) * max(dot(normal, lightInDir), 0);
-	vec3 specular = numerator / max(denominator, 0.001);
-
-	return specular;
+    return hitInfo.T != FLOAT_MAX;
 }
 
-vec3 brdfDiffuse(vec3 albedo, vec3 lightInDir, vec3 lightOutDir, vec3 normal)
+bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out float t2)
 {
-	return albedo * ONE_OVER_PI;
+    t1 = t2 = FLOAT_MAX;
+
+    vec3 sphereToRay = ray.Origin - position;
+    float b = dot(ray.Direction, sphereToRay);
+    float c = dot(sphereToRay, sphereToRay) - radius * radius;
+    float discriminant = b * b - c;
+
+    if (discriminant < 0)
+        return false;
+
+    float squareRoot = sqrt(discriminant);
+    t1 = -b - squareRoot;
+    t2 = -b + squareRoot;
+
+    return true;
 }
 
-vec3 brdf(vec3 albedo, vec3 lightInDir, vec3 lightOutDir, vec3 normal, vec3 kD, vec3 F0, float roughness, float metallic)
+bool RayCuboidIntersect(Ray ray, vec3 aabbMin, vec3 aabbMax, out float t1, out float t2)
 {
-	return brdfSpecular(lightInDir, lightOutDir, normal, F0, roughness, metallic)
-		+ brdfDiffuse(albedo, lightInDir, lightOutDir, normal) * kD;
+    t1 = FLOAT_MIN;
+    t2 = FLOAT_MAX;
+
+    vec3 t0s = (aabbMin - ray.Origin) * (1.0 / ray.Direction);
+    vec3 t1s = (aabbMax - ray.Origin) * (1.0 / ray.Direction);
+
+    vec3 tsmaller = min(t0s, t1s);
+    vec3 tbigger = max(t0s, t1s);
+
+    t1 = max(t1, max(tsmaller.x, max(tsmaller.y, tsmaller.z)));
+    t2 = min(t2, min(tbigger.x, min(tbigger.y, tbigger.z)));
+
+    return t1 <= t2;
 }
 
-float DistributionGGX(vec3 N, vec3 H, float roughness)
+vec3 GetNormal(vec3 spherePos, float radius, vec3 surfacePosition)
 {
-	float a = roughness * roughness;
-	float a2 = a * a;
-	float NdotH = max(dot(N, H), 0.0);
-	float NdotH2 = NdotH * NdotH;
-
-	float num = a2;
-	float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-	denom = PI * denom * denom;
-
-	return num / denom;
+    return (surfacePosition - spherePos) / radius;
 }
 
-float GeometrySchlickGGX(float NdotV, float roughness)
+vec3 GetNormal(vec3 aabbMin, vec3 aabbMax, vec3 surfacePosition)
 {
-	float r = (roughness + 1.0);
-	float k = (r * r) / 8.0;
+    vec3 halfSize = (aabbMax - aabbMin) * 0.5;
+    vec3 centerSurface = surfacePosition - (aabbMax + aabbMin) * 0.5;
 
-	float num = NdotV;
-	float denom = NdotV * (1.0 - k) + k;
-
-	return num / denom;
+    vec3 normal = vec3(0.0);
+    normal += vec3(sign(centerSurface.x), 0.0, 0.0) * step(abs(abs(centerSurface.x) - halfSize.x), EPSILON);
+    normal += vec3(0.0, sign(centerSurface.y), 0.0) * step(abs(abs(centerSurface.y) - halfSize.y), EPSILON);
+    normal += vec3(0.0, 0.0, sign(centerSurface.z)) * step(abs(abs(centerSurface.z) - halfSize.z), EPSILON);
+    return normalize(normal);
 }
 
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+vec3 GetCosWeightedHemissphereDir(inout uint rndSeed, vec3 normal)
 {
-	float NdotV = max(dot(N, V), 0.0);
-	float NdotL = max(dot(N, L), 0.0);
+    float z = GetRandomFloat01(rndSeed) * 2.0 - 1.0;
+    float a = GetRandomFloat01(rndSeed) * 2.0 * PI;
+    float r = sqrt(1.0 - z * z);
+    float x = r * cos(a);
+    float y = r * sin(a);
 
-	float ggx2 = GeometrySchlickGGX(NdotV, roughness);
-	float ggx1 = GeometrySchlickGGX(NdotL, roughness);
-
-	return ggx1 * ggx2;
+    // Convert unit vector in sphere to a cosine weighted vector in hemissphere
+    return normalize(normal + vec3(x, y, z));
 }
 
-vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+vec2 GetPointOnCircle(inout uint rndSeed)
 {
-	return F0 + (max(vec3(1 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+    float angle = GetRandomFloat01(rndSeed) * 2.0 * PI;
+    float r = sqrt(GetRandomFloat01(rndSeed));
+    return vec2(cos(angle), sin(angle)) * r;
 }
 
-vec3 FresnelSchlick(float cosTheta, vec3 F0)
+uint GetPCGHash(inout uint seed)
 {
-	return F0 + (1 - F0) * pow(1.0 - cosTheta, 5.0);
+    seed = seed * 747796405u + 2891336453u;
+    uint word = ((seed >> ((seed >> 28u) + 4u)) ^ seed) * 277803737u;
+    return (word >> 22u) ^ word;
 }
 
-#define spatialrand vec2
-
-vec3 ortho(vec3 v)
+float GetRandomFloat01(inout uint state)
 {
-	return normalize(abs(v.x) > abs(v.z) ? vec3(-v.y, v.x, 0.0) : vec3(0.0, -v.z, v.y));
+    return float(GetPCGHash(state)) / 4294967296.0;
 }
 
-uvec3 pcg3d(uvec3 v)
+float GetSmallestPositive(float t1, float t2)
 {
-	v = v * 1664525u + 1013904223u;
-
-	v.x += v.y * v.z;
-	v.y += v.z * v.x;
-	v.z += v.x * v.y;
-
-	v ^= v >> 16u;
-
-	v.x += v.y * v.z;
-	v.y += v.z * v.x;
-	v.z += v.x * v.y;
-
-	return v;
+    // Assumes at least one float > 0
+    return t1 < 0 ? t2 : t1;
 }
 
-vec3 random3(vec3 f)
+float FresnelSchlick(float cosTheta, float n1, float n2)
 {
-	return uintBitsToFloat((pcg3d(floatBitsToUint(f)) & 0x007FFFFFu) | 0x3F800000u) - 1.0;
+    float r0 = (n1 - n2) / (n1 + n2);
+    r0 *= r0;
+    return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
 }
 
-vec3 around(vec3 v, vec3 z)
+Ray GetWorldSpaceRay(mat4 inverseProj, mat4 inverseView, vec3 viewPos, vec2 normalizedDeviceCoords)
 {
-	vec3 t = ortho(z), b = cross(z, t);
-	return t * v.x + b * v.y + z * v.z;
-}
-
-vec3 isotropic(float rp, float c)
-{
-	float p = TWO_PI * rp, s = sqrt(1.0 - c * c);
-	return vec3(cos(p) * s, sin(p) * s, c);
-}
-
-vec4 randomHemispherePoint(vec3 n, spatialrand rand)
-{
-	return vec4(around(isotropic(rand.x, rand.y), n), ONE_OVER_2PI);
-}
-
-float hemisphereProbability(vec3 n, vec3 v)
-{
-	return step(0.0, dot(v, n)) * ONE_OVER_2PI;
-}
-
-vec4 randomDiskPoint(vec3 n, float d, float r, spatialrand rand)
-{
-	float D = r / d, c = inversesqrt(1.0 + D * D), pr = ONE_OVER_2PI / (1.0 - c);
-	return vec4(around(isotropic(rand.x, 1.0 - rand.y * (1.0 - c)), n), pr);
-}
-
-float diskProbability(vec3 n, float d, float r, vec3 v)
-{
-	float D = r / d, c = inversesqrt(1.0 + D * D);
-	return step(c, dot(n, v)) * ONE_OVER_2PI / (1.0 - c);
+    vec4 rayEye = inverseProj * vec4(normalizedDeviceCoords.xy, -1.0, 0.0);
+    rayEye.zw = vec2(-1.0, 0.0);
+    return Ray(viewPos, normalize((inverseView * rayEye).xyz));
 }
