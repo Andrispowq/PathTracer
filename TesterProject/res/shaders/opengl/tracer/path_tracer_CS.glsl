@@ -2,7 +2,7 @@
 
 precision highp float;
 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(binding = 0, rgba32f) uniform image2D tracedImage;
 
@@ -10,8 +10,9 @@ layout(binding = 0, rgba32f) uniform image2D tracedImage;
 #define FLOAT_MIN -3.4028235e+38
 #define PI 3.1415926535898
 
-#define NUM_BOXES 15//20
-#define NUM_SPHERES 1
+#define NUM_BOXES 15+5+2+4
+#define NUM_SPHERES 2
+#define NUM_VOLUMES 1
 #define EPSILON 1E-4
 #define LIGHT_INTENSITY 10.0
 #define BACKGROUND_INTENSITY 2.0
@@ -55,19 +56,39 @@ struct Box
 	Material Material;
 };
 
+struct Sphere 
+{
+    vec3 Position;
+    float Radius;
+
+    Material Material;
+};
+
+struct Volume
+{
+    vec3 Position;
+    float Radius;
+
+    vec3 Albedo;
+    vec3 Absorbance;
+};
+
 const Box boxes[NUM_BOXES] = 
 {
 	{vec3(-5.0, -0.1, -5.0), vec3(5.0, 0.0,  5.0), { vec3(1.0), 0.1, vec3(0.0), 0.0, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- floor
 	{vec3(-5.0,  5.1, -5.0), vec3(5.0, 5.0,  5.0), { vec3(0.00, 0.45, 0.33), 0.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- top
 	{vec3(-5.1,  0.0, -5.0), vec3(-5.0, 5.0,  5.0), { vec3(0.5, 0.2, 0.09), 0.2, vec3(0.0), 0.3, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- left wall
-	{vec3(5.0,  0.0, -5.0), vec3(5.1, 5.0,  5.0), { vec3(0.4, 0.4, 0.4), 0.2, vec3(0.0), 0.2, vec3(0.0), 0.8, 0.2, 1.1 }}, // <- right wall
+	//{vec3(5.0,  0.0, -5.0), vec3(5.1, 5.0,  5.0), { vec3(0.4, 0.4, 0.4), 0.2, vec3(0.0), 0.2, vec3(0.0), 0.8, 0.2, 1.0 }}, // <- right wall
 	//
-	//{vec3( 5.0,  0.0,  5.0), vec3( 5.1, 5.0,  3.0), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - left
-	//{vec3( 5.0,  0.0,  1.5), vec3( 5.1, 5.0, -2.0), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - middle
-	//{vec3( 5.0,  3.0,  3.0), vec3( 5.1, 5.0,  1.5), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - door top
-	//{vec3( 5.0,  0.0, -3.5), vec3( 5.1, 5.0, -5.0), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - right
-	//{vec3( 5.0,  0.0, -2.0), vec3( 5.1, 2.5, -3.5), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - top
-	//{vec3( 5.0,  3.8, -2.0), vec3( 5.1, 5.0, -3.5), vec3(0.4, 0.4, 0.4), 0.3, 0.6, vec3(0.0), 0.0}, // <- right wall - bottom
+	{vec3( 5.0,  0.0,  5.0), vec3( 5.1, 5.0,  3.0), { vec3(0.4, 0.4, 0.4), 0.3, vec3(0.0), 0.6, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- right wall - left
+	{vec3( 5.0,  0.0,  1.5), vec3( 5.1, 5.0, -2.0), { vec3(0.4, 0.4, 0.4), 0.3, vec3(0.0), 0.6, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- right wall - middle
+	{vec3( 5.0,  3.0,  3.0), vec3( 5.1, 5.0,  1.5), { vec3(0.4, 0.4, 0.4), 0.3, vec3(0.0), 0.6, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- right wall - door top
+	{vec3( 5.0,  0.0, -3.5), vec3( 5.1, 5.0, -5.0), { vec3(0.4, 0.4, 0.4), 0.3, vec3(0.0), 0.6, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- right wall - right
+	{vec3( 5.0,  0.0, -2.0), vec3( 5.1, 2.5, -3.5), { vec3(0.4, 0.4, 0.4), 0.3, vec3(0.0), 0.6, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- right wall - top
+	{vec3( 5.0,  3.8, -2.0), vec3( 5.1, 5.0, -3.5), { vec3(0.4, 0.4, 0.4), 0.3, vec3(0.0), 0.6, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- right wall - bottom
+    //
+    {vec3(5.0,  2.5,  -2.0), vec3(5.1, 3.8,  -3.5), { vec3(0.8, 0.8, 0.8), 0.1, vec3(0.0), 0.2, vec3(0.25), 0.9, 0.2, 1.3 }}, // <- right wall - window
+    {vec3(5.0,  0.0,  1.5), vec3(5.1, 3.0,  3.0), { vec3(0.8, 0.8, 0.8), 0.1, vec3(0.0), 0.2, vec3(0.25), 0.9, 0.2, 1.3 }}, // <- right wall - door
 	//
 	{vec3(-5.0,  0.0, -5.1), vec3(5.0, 5.0, -5.0), { vec3(0.43, 0.52, 0.27), 0.2, vec3(0.0), 1.0, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- back wall
 	{vec3(-5.0,  0.0,  5.0), vec3(5.0, 5.0,  5.1), { vec3(0.5, 0.2, 0.09), 0.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- front wall
@@ -77,13 +98,24 @@ const Box boxes[NUM_BOXES] =
 	{vec3(0.8,  0.0, -1.0), vec3(1.0, 1.0, -0.8), { vec3(0.4, 0.3, 0.15), 0.1, vec3(0.0), 0.4, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- table foot
 	{vec3(0.8,  0.0,  0.8), vec3(1.0, 1.0,  1.0), { vec3(0.4, 0.3, 0.15), 0.1, vec3(0.0), 0.4, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- table foot
 	{vec3(3.0,  0.0, -4.9), vec3(3.3, 2.0, -4.6), { vec3(0.6, 0.6, 0.6), 1.0, vec3(0.0), 0.1, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "pillar"
-	//{vec3(-4.8,  4.9, -4.7), vec3( 4.8, 5.0, -4.8), vec3(1.0, 1.0, 1.0), 1.0, 0.2, vec3(5.0, 0, 0)},  // <- some "LED"
-	//{vec3(-4.8,  4.9,  4.7), vec3( 4.8, 5.0,  4.8), vec3(1.0, 1.0, 1.0), 1.0, 0.2, vec3(0, 5.0, 0)},  // <- some "LED"
-	//{vec3(-4.7,  4.9, -4.8), vec3(-4.8, 5.0,  4.8), vec3(1.0, 1.0, 1.0), 1.0, 0.2, vec3(0, 0, 5.0)},  // <- some "LED"
-	//{vec3( 4.7,  4.9, -4.8), vec3( 4.8, 5.0,  4.8), vec3(1.0, 1.0, 1.0), 1.0, 0.2, vec3(5.0, 5.0, 0)},  // <- some "LED"
-	{vec3(-2.0,  2.5, -4.9), vec3(2.0, 3.0, -5.0), { vec3(1.0, 1.0, 1.0), 1.0, vec3(10.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big LED
+	{vec3(-4.8,  4.9, -4.7), vec3( 4.8, 5.0, -4.8), { vec3(1.0, 1.0, 1.0), 1.0, vec3(5.0, 0, 0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "LED"
+    {vec3(-4.8,  4.9,  4.7), vec3(4.8, 5.0,  4.8), { vec3(1.0, 1.0, 1.0), 1.0, vec3(0, 5.0, 0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "LED"
+    {vec3(-4.7,  4.9, -4.8), vec3(-4.8, 5.0,  4.8), { vec3(1.0, 1.0, 1.0), 1.0, vec3(0, 0, 5.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "LED"
+    {vec3(4.7,  4.9, -4.8), vec3(4.8, 5.0,  4.8), { vec3(1.0, 1.0, 1.0), 1.0, vec3(5.0, 5.0, 0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "LED"
+	{vec3(-2.0,  2.5, -4.9), vec3(2.0, 3.0, -5.0), { vec3(1.0, 1.0, 1.0), 1.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big LED
 	{vec3(9.0,  2.5, -0.5), vec3(10.0, 3.5, 0.5), { vec3(1.0, 1.0, 1.0), 1.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big glass
 	{vec3(-0.2, 1.1, -0.01), vec3(0.2, 2.0, 0.01), { vec3(0.56, 0.57, 0.58), 1.0, vec3(0.0), 0.05, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big mirror
+};
+
+const Sphere spheres[NUM_SPHERES] =
+{
+    {vec3(10.0, 15.0, -30.0), 2.0, { vec3(1.0, 0.87, 0.56), 1.0, vec3(10.0, 8.7, 5.6), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }}, //Big light
+    {vec3(0.0, 3.2, -0.0), 0.5, { vec3(1.0, 1.0, 1.0), 0.0, vec3(0.0), 0.05, vec3(0.0), 1.0, 0.05, 1.6 }} //small sphere
+};
+
+const Volume volumes[NUM_VOLUMES] =
+{
+    { vec3(0.0, 0.0, 0.0), 40.0, vec3(1.0, 1.0, 1.0), vec3(0.0) } //everything inside
 };
 
 struct HitInfo 
@@ -104,6 +136,7 @@ struct Ray
 
 vec3 Radiance(Ray ray);
 bool GetClosestIntersectingRayObject(Ray ray, out HitInfo hitInfo);
+bool RaySphereIntersect(Ray ray, vec3 position, float radius, out float t1, out float t2);
 bool RayCuboidIntersect(Ray ray, vec3 aabbMin, vec3 aabbMax, out float t1, out float t2);
 vec3 GetNormal(vec3 spherePos, float radius, vec3 surfacePosition);
 vec3 GetNormal(vec3 aabbMin, vec3 aabbMax, vec3 surfacePosition);
@@ -115,10 +148,10 @@ float GetSmallestPositive(float t1, float t2);
 float FresnelSchlick(float cosTheta, float n1, float n2);
 Ray GetWorldSpaceRay(mat4 inverseProj, mat4 inverseView, vec3 viewPos, vec2 normalizedDeviceCoords);
 
-uniform int rayDepth = 15;
-uniform int SSP = 50;
+uniform int rayDepth = 50;
+uniform int SSP = 20;
 
-uniform float focalLength = 5.0;
+uniform float focalLength = 3.0;
 uniform float apertureDiameter = 0.14;
 
 uint rndSeed;
@@ -129,7 +162,8 @@ void main(void)
 
 	rndSeed = gl_GlobalInvocationID.x * 1973 + gl_GlobalInvocationID.y * 9277 + current_spp * 2699 | 1;
 	vec3 colour = vec3(0);
-	for (int i = 0; i < SSP; i++)
+    int samplesPerPixel = current_spp < 2 ? 1 : SSP;
+	for (int i = 0; i < samplesPerPixel; i++)
 	{
 		vec2 subPixelOffset = vec2(GetRandomFloat01(rndSeed), GetRandomFloat01(rndSeed)) - 0.5; // integrating over whole pixel eliminates aliasing
 		vec2 ndc = (imgCoord + subPixelOffset) / imgResultSize * 2.0 - 1.0;
@@ -144,7 +178,7 @@ void main(void)
         colour += Radiance(rayEyeToWorld);
 	}
 
-	colour /= SSP;
+	colour /= samplesPerPixel;
 
     if (current_spp > 1)
     {
@@ -168,6 +202,17 @@ vec3 Radiance(Ray ray)
             {
                 hitInfo.Normal *= -1.0;
                 throughPut *= exp(-hitInfo.Material.Absorbance * hitInfo.T);
+            }
+
+            for (int j = 0; j < NUM_VOLUMES; j++)
+            {
+                Volume volume = volumes[j];
+
+                float dist = length(hitInfo.NearHitPos - volume.Position);
+                if (dist < volume.Radius)
+                {
+                    throughPut *= exp(-volume.Absorbance * dist);
+                }
             }
 
             float specularChance = hitInfo.Material.SpecularChance;
@@ -237,19 +282,19 @@ bool GetClosestIntersectingRayObject(Ray ray, out HitInfo hitInfo)
     hitInfo.T = FLOAT_MAX;
     float t1, t2;
 
-    /*for (int i = 0; i < NUM_SPHERES; i++)
+    for (int i = 0; i < NUM_SPHERES; i++)
     {
-        vec3 pos = gameObjectsUBO.Spheres[i].Position;
-        float radius = gameObjectsUBO.Spheres[i].Radius;
+        vec3 pos = spheres[i].Position;
+        float radius = spheres[i].Radius;
         if (RaySphereIntersect(ray, pos, radius, t1, t2) && t2 > 0 && t1 < hitInfo.T)
         {
             hitInfo.T = GetSmallestPositive(t1, t2);
             hitInfo.FromInside = hitInfo.T == t2;
-            hitInfo.Material = gameObjectsUBO.Spheres[i].Material;
+            hitInfo.Material = spheres[i].Material;
             hitInfo.NearHitPos = ray.Origin + ray.Direction * hitInfo.T;
             hitInfo.Normal = GetNormal(pos, radius, hitInfo.NearHitPos);
         }
-    }*/
+    }
 
     for (int i = 0; i < NUM_BOXES; i++)
     {

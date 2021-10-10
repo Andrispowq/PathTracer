@@ -27,7 +27,7 @@ namespace Prehistoric
 		rayTracingPipeline = manager->storePipeline(new GLComputePipeline(window, man, traceShader));
 		presentPipeline = manager->storePipeline(new GLGraphicsPipeline(window, man, presentShader, quadVBO));
 
-		static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ dim.x / 32, dim.y / 32, 1 });
+		static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ (dim.x / 16) + 1, (dim.y / 16) + 1, 1 });
 		static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->addTextureBinding(0, tracedImage.pointer, READ_WRITE);
 	}
 
@@ -52,7 +52,7 @@ namespace Prehistoric
 
 			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->removeTextureBinding(0);
 			tracedImage = man->storeTexture(GLTexture::Storage2D(width, height));
-			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ width / 32, height / 32, 1 });
+			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->setInvocationSize({ (width / 16) + 1, (height / 16) + 1, 1 });
 			static_cast<GLComputePipeline*>(rayTracingPipeline.pointer)->addTextureBinding(0, tracedImage.pointer, WRITE_ONLY);
 
 			camera->setChanged();
