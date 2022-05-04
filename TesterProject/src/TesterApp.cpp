@@ -13,6 +13,7 @@ TesterApp::TesterApp()
 
 	//GameObject* audio = new GameObject();
 	//audio->AddComponent(AUDIO_COMPONENT, new AudioComponent("res/sounds/_Closer.wav", 75.0f));
+	//audio->AddComponent(AUDIO_COMPONENT, new AudioComponent("res/sounds/_FlipReset.wav", 54.0f));
 	//audio->GetComponent<AudioComponent>()->PreUpdate(engineLayer);
 
 	//engineLayer->getRootObject()->AddChild("audio", audio);

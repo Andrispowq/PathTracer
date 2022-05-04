@@ -10,8 +10,8 @@ layout(binding = 0, rgba32f) uniform image2D tracedImage;
 #define FLOAT_MIN -3.4028235e+38
 #define PI 3.1415926535898
 
-#define NUM_BOXES 15+5+2+4
-#define NUM_SPHERES 2
+#define NUM_BOXES 14+5+2+2//+4
+#define NUM_SPHERES 3
 #define NUM_VOLUMES 1
 #define EPSILON 1E-4
 #define LIGHT_INTENSITY 10.0
@@ -75,8 +75,8 @@ struct Volume
 
 const Box boxes[NUM_BOXES] = 
 {
-	{vec3(-5.0, -0.1, -5.0), vec3(5.0, 0.0,  5.0), { vec3(1.0), 0.1, vec3(0.0), 0.0, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- floor
-	{vec3(-5.0,  5.1, -5.0), vec3(5.0, 5.0,  5.0), { vec3(0.00, 0.45, 0.33), 0.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- top
+	{vec3(-5.0, -0.1, -5.0), vec3(5.0, 0.0,  5.0), { vec3(1.0), 0.1, vec3(0.0), 0.8, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- floor
+	{vec3(-5.0,  5.0, -5.0), vec3(5.0, 5.1,  5.0), { vec3(0.01, 0.45, 0.33), 1.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- top
 	{vec3(-5.1,  0.0, -5.0), vec3(-5.0, 5.0,  5.0), { vec3(0.5, 0.2, 0.09), 0.2, vec3(0.0), 0.3, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- left wall
 	//{vec3(5.0,  0.0, -5.0), vec3(5.1, 5.0,  5.0), { vec3(0.4, 0.4, 0.4), 0.2, vec3(0.0), 0.2, vec3(0.0), 0.8, 0.2, 1.0 }}, // <- right wall
 	//
@@ -87,8 +87,11 @@ const Box boxes[NUM_BOXES] =
 	{vec3( 5.0,  0.0, -2.0), vec3( 5.1, 2.5, -3.5), { vec3(0.4, 0.4, 0.4), 0.3, vec3(0.0), 0.6, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- right wall - top
 	{vec3( 5.0,  3.8, -2.0), vec3( 5.1, 5.0, -3.5), { vec3(0.4, 0.4, 0.4), 0.3, vec3(0.0), 0.6, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- right wall - bottom
     //
-    {vec3(5.0,  2.5,  -2.0), vec3(5.1, 3.8,  -3.5), { vec3(0.8, 0.8, 0.8), 0.1, vec3(0.0), 0.2, vec3(0.25), 0.9, 0.2, 1.3 }}, // <- right wall - window
-    {vec3(5.0,  0.0,  1.5), vec3(5.1, 3.0,  3.0), { vec3(0.8, 0.8, 0.8), 0.1, vec3(0.0), 0.2, vec3(0.25), 0.9, 0.2, 1.3 }}, // <- right wall - door
+    //{vec3(5.00,  2.5,  -2.0), vec3(5.10, 3.8,  -3.5), { vec3(1.0, 1.0, 1.0), 0.4, vec3(0.0), 0.05, vec3(0.0), 0.6, 0.05, 1.3 }}, // <- right wall - window
+    {vec3(5.00,  2.5,  -2.0), vec3(5.02, 3.8,  -3.5), { vec3(1.0, 0.0, 0.0), 0.4, vec3(0.0), 0.05, vec3(0.0), 0.6, 0.05, 1.3 }}, // <- right wall - window
+    {vec3(5.04,  2.5,  -2.0), vec3(5.06, 3.8,  -3.5), { vec3(0.0, 1.0, 0.0), 0.4, vec3(0.0), 0.05, vec3(0.0), 0.6, 0.05, 1.3 }}, // <- right wall - window
+    {vec3(5.08,  2.5,  -2.0), vec3(5.10, 3.8,  -3.5), { vec3(0.0, 0.0, 1.0), 0.4, vec3(0.0), 0.05, vec3(0.0), 0.6, 0.05, 1.3 }}, // <- right wall - window
+    {vec3(5.0,  0.0,  1.5), vec3(5.1, 3.0,  3.0), { vec3(0.0, 1.0, 1.0), 0.1, vec3(0.0), 0.2, vec3(0.25), 0.9, 0.0, 1.3 }}, // <- right wall - door
 	//
 	{vec3(-5.0,  0.0, -5.1), vec3(5.0, 5.0, -5.0), { vec3(0.43, 0.52, 0.27), 0.2, vec3(0.0), 1.0, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- back wall
 	{vec3(-5.0,  0.0,  5.0), vec3(5.0, 5.0,  5.1), { vec3(0.5, 0.2, 0.09), 0.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- front wall
@@ -98,24 +101,24 @@ const Box boxes[NUM_BOXES] =
 	{vec3(0.8,  0.0, -1.0), vec3(1.0, 1.0, -0.8), { vec3(0.4, 0.3, 0.15), 0.1, vec3(0.0), 0.4, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- table foot
 	{vec3(0.8,  0.0,  0.8), vec3(1.0, 1.0,  1.0), { vec3(0.4, 0.3, 0.15), 0.1, vec3(0.0), 0.4, vec3(0.0), 0.0, 0.0, 1.0 }}, // <- table foot
 	{vec3(3.0,  0.0, -4.9), vec3(3.3, 2.0, -4.6), { vec3(0.6, 0.6, 0.6), 1.0, vec3(0.0), 0.1, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "pillar"
-	{vec3(-4.8,  4.9, -4.7), vec3( 4.8, 5.0, -4.8), { vec3(1.0, 1.0, 1.0), 1.0, vec3(5.0, 0, 0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "LED"
+	/*{vec3(-4.8,  4.9, -4.7), vec3(4.8, 5.0, -4.8), {vec3(1.0, 1.0, 1.0), 1.0, vec3(5.0, 0, 0), 0.2, vec3(0.0), 0.0, 0.0, 1.0}},  // <- some "LED"
     {vec3(-4.8,  4.9,  4.7), vec3(4.8, 5.0,  4.8), { vec3(1.0, 1.0, 1.0), 1.0, vec3(0, 5.0, 0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "LED"
     {vec3(-4.7,  4.9, -4.8), vec3(-4.8, 5.0,  4.8), { vec3(1.0, 1.0, 1.0), 1.0, vec3(0, 0, 5.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "LED"
-    {vec3(4.7,  4.9, -4.8), vec3(4.8, 5.0,  4.8), { vec3(1.0, 1.0, 1.0), 1.0, vec3(5.0, 5.0, 0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "LED"
-	{vec3(-2.0,  2.5, -4.9), vec3(2.0, 3.0, -5.0), { vec3(1.0, 1.0, 1.0), 1.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big LED
-	{vec3(9.0,  2.5, -0.5), vec3(10.0, 3.5, 0.5), { vec3(1.0, 1.0, 1.0), 1.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big glass
+    {vec3(4.7,  4.9, -4.8), vec3(4.8, 5.0,  4.8), { vec3(1.0, 1.0, 1.0), 1.0, vec3(5.0, 5.0, 0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- some "LED"*/
+	{vec3(-2.0,  2.5, -5.0), vec3(2.0, 3.0, -4.9), { vec3(1.0, 1.0, 1.0), 1.0, vec3(10.0), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big LED
 	{vec3(-0.2, 1.1, -0.01), vec3(0.2, 2.0, 0.01), { vec3(0.56, 0.57, 0.58), 1.0, vec3(0.0), 0.05, vec3(0.0), 0.0, 0.0, 1.0 }},  // <- Big mirror
 };
 
 const Sphere spheres[NUM_SPHERES] =
 {
-    {vec3(10.0, 15.0, -30.0), 2.0, { vec3(1.0, 0.87, 0.56), 1.0, vec3(10.0, 8.7, 5.6), 0.2, vec3(0.0), 0.0, 0.0, 1.0 }}, //Big light
-    {vec3(0.0, 3.2, -0.0), 0.5, { vec3(1.0, 1.0, 1.0), 0.0, vec3(0.0), 0.05, vec3(0.0), 1.0, 0.05, 1.6 }} //small sphere
+    { vec3(10.0, 15.0, -30.0), 2.0, { vec3(1.0, 0.87, 0.56), 1.0, vec3(10.0, 8.7, 5.6), 0.2, vec3(0.0), 0.0, 0.0, 1.0 } }, //Big light
+    { vec3(0.0, 3.2, -0.0), 0.5, { vec3(1.0, 1.0, 1.0), 0.0, vec3(0.0), 0.05, vec3(0.0), 1.0, 0.1, 1.3 } }, //small sphere
+    { vec3(9.5,  3.0, 0.0), 1.0, { vec3(1.0, 1.0, 1.0), 1.0, vec3(0.0), 0.2, vec3(0.0), 0.0, 0.0, 1.5 } },  // <- Big glass
 };
 
 const Volume volumes[NUM_VOLUMES] =
 {
-    { vec3(0.0, 0.0, 0.0), 40.0, vec3(1.0, 1.0, 1.0), vec3(0.0) } //everything inside
+    { vec3(0.0, 0.0, 0.0), 40.0, vec3(1.0, 1.0, 1.0), vec3(0.09, 0.06, 0.03) } //everything inside
 };
 
 struct HitInfo 
@@ -149,10 +152,10 @@ float FresnelSchlick(float cosTheta, float n1, float n2);
 Ray GetWorldSpaceRay(mat4 inverseProj, mat4 inverseView, vec3 viewPos, vec2 normalizedDeviceCoords);
 
 uniform int rayDepth = 50;
-uniform int SSP = 20;
+uniform int SSP = 1;//20;
 
-uniform float focalLength = 3.0;
-uniform float apertureDiameter = 0.14;
+uniform float focalLength = 4.3;
+uniform float apertureDiameter = 0.14/200;
 
 uint rndSeed;
 void main(void) 
@@ -189,6 +192,116 @@ void main(void)
 	imageStore(tracedImage, imgCoord, vec4(colour, 1.0));
 }
 
+
+
+const float G_SCATTERING = 0.0003;
+const float G_SMOKE_COMPOSITE_CONSTANT = 0.8;
+const int NB_STEPS = 100;
+const vec3 G_SUN_POSITION = vec3(400, 400, -400);
+const vec3 G_SUN_COLOUR = vec3(1.0);
+
+float ComputeScattering(float lightDotView)
+{
+    float result = 1.0f - G_SCATTERING * G_SCATTERING;
+    result /= (4.0f * PI * pow(1.0f + G_SCATTERING * G_SCATTERING - (2.0f * G_SCATTERING) * lightDotView, 1.5f));
+    return result;
+}
+
+vec3 GetVolumetricForTransparent(Volume volume, vec3 startPos, vec3 lightPos)
+{
+    vec3 rayVector = lightPos - startPos;
+    int steps = NB_STEPS;
+    float rayLength = length(rayVector);
+    vec3 rayDir = rayVector / rayLength;
+    float stepLength = rayLength / float(steps);
+    vec3 step = stepLength * rayDir;
+
+    vec3 currentPos = startPos;
+    vec3 volumetrics = vec3(1.0);
+    for (int i = 0; i < steps; i++)
+    {
+        float dist = length(currentPos - volume.Position);
+        if (dist < volume.Radius)
+        {
+            Ray toLightRay;
+            toLightRay.Origin = currentPos;
+            toLightRay.Direction = normalize(rayVector);
+
+            HitInfo lightHitInfo;
+            bool hit = GetClosestIntersectingRayObject(toLightRay, lightHitInfo);
+            if (hit)
+            {
+                if (lightHitInfo.Material.RefractionChance == 0.0)
+                {
+                    return vec3(0.0);
+                }
+                else
+                {
+                    volumetrics *= lightHitInfo.Material.RefractionChance * lightHitInfo.Material.Albedo;
+                    currentPos += step;
+                    continue;
+                }
+            }
+            else
+            {
+                //return vec3(0.0);
+            }
+
+            currentPos += step;
+        }
+    }
+
+    return volumetrics;
+}
+
+vec3 GetVolumetricLight(Volume volume, vec3 hitPos, vec3 rayDirection)
+{
+    vec3 source = ViewPos;
+
+    vec3 rayVector = hitPos - source;
+    int steps = NB_STEPS;
+    float rayLength = length(rayVector);
+    vec3 rayDir = rayVector / rayLength;
+    float stepLength = rayLength / float(steps);
+    vec3 step = stepLength * rayDir;
+
+    float scatter = ComputeScattering(dot(rayDirection, normalize(-G_SUN_POSITION)));
+
+    vec3 currentPos = source;
+    vec3 volumetrics = vec3(0.0);
+    for (int i = 0; i < steps; i++)
+    {
+        float dist = length(currentPos - volume.Position);
+        if (dist < volume.Radius)
+        {
+            vec3 toLight = normalize(G_SUN_POSITION - currentPos);
+
+            Ray toLightRay;
+            toLightRay.Origin = currentPos;
+            toLightRay.Direction = toLight;
+
+            HitInfo lightHitInfo;
+            bool hit = GetClosestIntersectingRayObject(toLightRay, lightHitInfo);
+            if (hit)
+            {
+                volumetrics += scatter * GetVolumetricForTransparent(volume, currentPos, G_SUN_POSITION);
+                currentPos += step;
+                continue;
+            }
+            else
+            {
+                volumetrics += vec3(scatter);
+            }
+        }
+
+        currentPos += step;
+    }
+
+    return volumetrics * G_SUN_COLOUR;
+}
+
+
+
 vec3 Radiance(Ray ray)
 {
     vec3 throughPut = vec3(1);
@@ -204,16 +317,15 @@ vec3 Radiance(Ray ray)
                 throughPut *= exp(-hitInfo.Material.Absorbance * hitInfo.T);
             }
 
+
+            /*vec3 totalFog = vec3(0.0);
             for (int j = 0; j < NUM_VOLUMES; j++)
             {
                 Volume volume = volumes[j];
+                vec3 fog = GetVolumetricLight(volume, hitInfo.NearHitPos, ray.Direction);
+                totalFog += fog;
+            }*/
 
-                float dist = length(hitInfo.NearHitPos - volume.Position);
-                if (dist < volume.Radius)
-                {
-                    throughPut *= exp(-volume.Absorbance * dist);
-                }
-            }
 
             float specularChance = hitInfo.Material.SpecularChance;
             float refractionChance = hitInfo.Material.RefractionChance;
@@ -260,16 +372,17 @@ vec3 Radiance(Ray ray)
             rayProbability = max(rayProbability, EPSILON);
             throughPut /= rayProbability;
 
-
             float p = max(throughPut.x, max(throughPut.y, throughPut.z));
             if (GetRandomFloat01(rndSeed) > p)
                 break;
 
             throughPut *= 1.0 / p;
+            //throughPut = mix(throughPut, totalFog, G_SMOKE_COMPOSITE_CONSTANT);
         }
         else
         {
-            ret += texture(environment, ray.Direction).rgb * throughPut;
+            //vec3 environmentFog = GetVolumetricLight(volumes[0], ray.Origin + ray.Direction * 100, ray.Direction);
+            ret += texture(environment, ray.Direction).rgb * throughPut;//mix(texture(environment, ray.Direction).rgb * throughPut, environmentFog, G_SMOKE_COMPOSITE_CONSTANT);
             break;
         }
     }
@@ -286,7 +399,7 @@ bool GetClosestIntersectingRayObject(Ray ray, out HitInfo hitInfo)
     {
         vec3 pos = spheres[i].Position;
         float radius = spheres[i].Radius;
-        if (RaySphereIntersect(ray, pos, radius, t1, t2) && t2 > 0 && t1 < hitInfo.T)
+        if (RaySphereIntersect(ray, pos, radius, t1, t2) && (t2 > 0) && (t1 < hitInfo.T))
         {
             hitInfo.T = GetSmallestPositive(t1, t2);
             hitInfo.FromInside = hitInfo.T == t2;
@@ -300,7 +413,7 @@ bool GetClosestIntersectingRayObject(Ray ray, out HitInfo hitInfo)
     {
         vec3 aabbMin = boxes[i].Min;
         vec3 aabbMax = boxes[i].Max;
-        if (RayCuboidIntersect(ray, aabbMin, aabbMax, t1, t2) && t2 > 0 && t1 < hitInfo.T)
+        if (RayCuboidIntersect(ray, aabbMin, aabbMax, t1, t2) && (t2 > 0) && (t1 < hitInfo.T))
         {
             hitInfo.T = GetSmallestPositive(t1, t2);
             hitInfo.FromInside = hitInfo.T == t2;
